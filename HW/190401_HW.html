@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+  <title>
+    연속형 데이터 시각화(정규분포)
+  </title>
+  <style>
+    body {
+      text-align: center;
+      align-items: center;
+    }
+    svg {
+      width:700px;
+      height:500px;
+      border:1px solid black;
+    }
+    #BarGraph rect{
+      stroke:lightblue;
+      stroke-width:2px;
+      fill:lightblue;
+      opacity:0.7;
+    }
+    .title {
+      font-size:15pt;
+      fill:red;
+    }
+    .barname {
+      font-size:12pt;
+    }
+    .frep {
+      fonr-size:9pt;
+      fill:red;
+    }
+    .axis text {
+      font-family: sans-serif;
+      font-size: 12px;
+    }
+    .axis path,
+    .axis line {
+      fill:none;
+      stroke-width:1px;
+      stroke:black;
+    }
+  </style>
+  <script type="text/javascript" src="http://d3js.org/d3.v4.min.js"></script>
+  <script src='http://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js'></script>
+</head>
+
+<body>
+  <div style="float: left;">
+    <input type="button" value="첫 화면으로" onclick="location.href='index_start.html'">
+  </div>
+
+  <h2> 연속형 데이터 시각화(정규분포) </h2><hr>
+  <h3><span style="color:red;"> ex) R 패키지 iris dataset 살펴보기 </span><h3><br>
+
+  살펴볼 변수 :
+  <input type=radio name="radio1" value="Sepal_Length">Sepal_Length
+  <input type=radio name="radio1" value="Sepal_Width">Sepal_Width
+  <input type=radio name="radio1" value="Petal_Length">Petal_Length
+  <input type=radio name="radio1" value="Petal_Width">Petal_Width
+
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  구간 개수 :
+  <input type=text id="input1" value="">
+  <input type=button value="완료" onclick=hist_btn()><br><br>
+
+  <div>
+    <div style="width:700px; height:500px; border:1px solid black; overflow:auto; display:inline-block;" id="view_data"></div>&nbsp;&nbsp;&nbsp;
+    <svg id="BarGraph"></svg>
+  </div><br>
+  ※ 막대 위 숫자는 각 막대의 면적(가로X세로)입니다.
+
+  <script>
+  //C 드라이브에 chrome 임시 폴더 생성
+  //크롬 브라우저 속성 대상위치에 --disable-web-security --user-data-dir="C:\chrome" 추가
+
+  $(document).ready(function() { //로딩시 자동 실행
+    d3.csv("iris.csv", function(error, data_csv) {
+      if (error) throw error;
+      //alert(JSON.stringify(data_csv)) //데이터 형태 확인 완료
+      $('#view_data').html(dataToTable(data_csv)) //데이터를 table형태로 출력
+    })
+  })
+
+  //데이터를 html 테이블로 출력하는 함수
+  function dataToTable(data) {
+    var myHTMLStr = '<table>'
+    myHTMLStr += '<tr><td>' + "Sepal.Length"
+              + '</td><td>' + "Sepal.Width"
+              + '</td><td>' + "Petal.Length"
+              + '</td><td>' + "Petal.Width"
+              + '</td><td>' + "Species"
+              + '</td></tr>';
+
+    for(var i=0; i<data.length; i++) {
+      myHTMLStr += '<tr><td>' + data[i].Sepal_Length
+                + '</td><td>' + data[i].Sepal_Width
+                + '</td><td>' + data[i].Petal_Length
+                + '</td><td>' + data[i].Petal_Width
+                + '</td><td>' + data[i].Species
+                + '</td></tr>';
+    }
+    myHTMLStr +='</table>';
+    return myHTMLStr
+  }
+
+  //연속형 변수 파악 함수
+  function summary_conti(array, n) {
+    //array.sort()를 하면 메모리가 낭비될 수 있음
+    var min = Math.min.apply(Math, array)
+    var max = Math.max.apply(Math, array)
+    var section_name = new Array();
+    var section_num = new Array();
+
+    for (var i=0; i<n; i++) {
+      section_name.push(parseFloat(min + ((max-min) * i/n)))
+      section_num.push(0)
+    }
+    section_name.push(max)
+
+    for (var j of array) {
+      for (var k=0; k<n; k++){
+        if ((section_name[k] <= j) & (j < section_name[k+1])) {
+          section_num[k] += 1;
+          break;
+        }
+      }
+    }
+    return [section_name, section_num]
+  }
+
+  //평균 함수
+  function mean(array) {
+    var sum = 0
+    for(i=0; i<array.length; i++) {
+      sum += parseFloat(array[i])
+    }
+    return sum / array.length
+  }
+
+  //분산 함수
+  function dev(array) {
+    var m = mean(array)
+    var vsum = 0
+    for(i=0; i<array.length; i++) {
+      vsum += parseFloat((array[i]-m)*(array[i]-m))
+    }
+    return vsum / array.length
+  }
+
+  //표준편차 함수
+  function sdd(array) {
+    return Math.sqrt(dev(array))
+  }
+
+  //정규분포 함수
+  function normal(x, m, sd) {
+    var y = (1 / Math.sqrt(2*Math.PI)*sd) * Math.exp(-(x-m)*(x-m)/(2*sd*sd))
+    return y
+  }
+
+  //구간 개수에 상관없이 고정적인 그래프 변수
+  var bar;
+  var svgWidth = 700;
+  var svgHeight = 500;
+  var padding = 30; //좌,우,위,아래 여백
+  var interval = 0; //bar 사이 간격
+  var left_axis = 50 //왼쪽 축 공간
+  var title_area = 50 //제목 공간
+  var freq_area = 10 //범주별 도수 공간
+  var legend_area = 20 //범주 공간
+
+  //히스토그램 출력 함수
+  function hist_btn() {
+
+    d3.select("#BarGraph").selectAll("rect").remove() //기존 그래프 지우기
+    d3.select("#BarGraph").selectAll("line").remove()
+    d3.select("#BarGraph").selectAll("text").remove()
+    d3.select("#BarGraph").selectAll("g").remove()
+
+    d3.csv("iris.csv", function(error, data_csv) {
+      if (error) throw error;
+
+      var input_array = new Array();
+      var tmp = document.getElementsByName('radio1') //선택한 변수
+      for (var i=0; i<tmp.length; i++){
+        if (tmp[0].checked == true) {
+          for (var j=0; j<data_csv.length; j++) {
+            input_array.push(data_csv[j].Sepal_Length)
+          }
+          break
+        } else if(tmp[1].checked == true){
+          for (var j=0; j<data_csv.length; j++) {
+            input_array.push(data_csv[j].Sepal_Width)
+          }
+          break
+        } else if(tmp[2].checked == true){
+          for (var j=0; j<data_csv.length; j++) {
+            input_array.push(data_csv[j].Petal_Length)
+          }
+          break
+        } else if(tmp[3].checked == true){
+          for (var j=0; j<data_csv.length; j++) {
+            input_array.push(data_csv[j].Petal_Width)
+          }
+          break
+        } else {
+          alert("살펴볼 변수를 선택해주세요.")
+        }
+      }
+
+      var graphData;
+      var section_name;
+      var section_num;
+      var num = document.getElementById('input1').value
+      if (num == "") {
+        alert("구간 개수를 입력해주세요.")
+      } else {
+        graphData = summary_conti(input_array, parseInt(num))
+        section_name = graphData[0]
+        section_num = graphData[1]
+      }
+      //alert(section_name); alert(section_num);//확인 완료
+
+      var section_freq = new Array(); //막대 면적
+      var section_y = new Array(); //막대 높이
+      for (var i of section_num){
+        section_freq.push(i / input_array.length)
+        section_y.push(i / input_array.length / (section_name[1]-section_name[0]))
+      }
+      //alert(section_freq); alert(section_y) //확인 완료
+
+      //구간 개수에 따라 유동적인 그래프 변수
+      var barWidth = (svgWidth - 2*padding - left_axis - (num-1)*interval) / num
+      var dataMax = Math.max.apply(Math, section_y)
+      var dataMin = Math.min.apply(Math, section_y)
+      var coef_y = (svgHeight - 2*padding - title_area - freq_area - legend_area) / dataMax
+
+      var bar = d3.select("#BarGraph").selectAll("rect").data(section_y)
+      bar.enter() //제목
+         .append("text")
+         .text("< Histogram >")
+         .attr("x", svgWidth/2.5)
+         .attr("y", padding)
+
+      bar.enter() //히스토그램
+         .append("rect")
+         .attr("x", function(d, i) { return padding + left_axis + i*(barWidth+interval); })
+         .attr("y", svgHeight - padding - legend_area)
+         .attr("width", barWidth)
+         .attr("height", 0)
+         .transition()
+         .duration(2500) //동작 시간
+         .delay(function(d, i) { return i*200; }) //동작 시간
+         .attr("y", function(d, i) { return svgHeight - padding - legend_area - (coef_y*d); })
+         .attr("height", function(d, i) { return coef_y*d + "px"; })
+
+      bar.enter() //구간별 도수
+         .append("text")
+         .data(section_freq)
+         .attr("class", "freq")
+         .attr("x", function(d, i) { return padding + left_axis + barWidth/2.5 + (barWidth + interval)*i; })
+         .attr("y", padding + title_area - 10)
+         .text(function(d, i) { return d.toFixed(2); })
+
+      bar.enter() //구간 시작점
+         .append("text")
+         .data(section_name)
+         .attr("class", "barname")
+         .attr("x", function(d, i) { return padding + left_axis/2 + (barWidth + interval)*i; })
+         .attr("y", svgHeight - padding)
+         .text(function(d, i) { return d.toFixed(1); })
+
+      bar.enter() //구간 마지막 값
+         .append("text")
+         .text(section_name.pop().toFixed(1))
+         .attr("class", "barname")
+         .attr("x", svgWidth - padding - left_axis/3)
+         .attr("y", svgHeight - padding)
+
+      var yScale = d3.scaleLinear().domain([dataMin, dataMax]).range([svgHeight - padding - legend_area, padding + title_area + freq_area])
+      d3.select("#BarGraph").append("g") //축
+        .attr("class", "axis")
+        .attr("transform", `translate(${padding + left_axis/2}, 0)`)
+        .call(d3.axisLeft().scale(yScale))
+
+      //정규분포 N(m, sigma^2)을 덧붙여 그리기
+      var m = mean(input_array)
+      var sd = sdd(input_array)
+      var xmin = Math.min.apply(Math, input_array)
+      var xmax = Math.max.apply(Math, input_array)
+      var ymin = normal(xmin, m , sd)
+      var ymax = normal(m, m, sd)
+      var gap = (svgHeight - 2*padding - title_area - legend_area) / ymax
+
+      var repeat_n = 800
+      for(var i=0; i<repeat_n; i++) {
+        var line;
+        d3.select("#BarGraph")
+          .append("line")
+          .attr("x1", padding + left_axis + (svgWidth - 2*padding - left_axis) * (i/repeat_n))
+          .attr("y1", (svgHeight - padding - legend_area) - normal(xmin + (xmax-xmin) * i/repeat_n, m, sd) * gap)
+          .attr("x2", padding + left_axis + (svgWidth - 2*padding - left_axis) * ((i+1)/repeat_n))
+          .attr("y2", (svgHeight - padding - legend_area) - normal(xmin + (xmax-xmin) * (i+1)/repeat_n, m, sd) * gap)
+          .style("stroke","red")
+      }
+    })
+  }
+
+  </script>
+
+</body>
+</html>

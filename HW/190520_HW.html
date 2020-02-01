@@ -1,0 +1,112 @@
+<html>
+<head>
+  <title> Hierarchy Data Visualization </title>
+  <style>
+  .node {
+     fill: skyblue;
+     stroke: grey;
+   }
+   .link {
+     fill: none;
+     stroke: #ccc;
+     stroke-width: 2px;
+   }
+   .text {
+     font-size: 10pt;
+     text-anchor: middle;
+     fill:black;
+   }
+  </style>
+  <script src="http://d3js.org/d3.v2.min.js"></script>
+</head>
+
+<body>
+  <h2> 네트워크 그래프 실습 </h2>
+
+  <script>
+
+  var width = 500;
+  var height = 500;
+
+  var svg = d3.select("body")
+              .append("svg")
+              .attr("width", width)
+              .attr("height", height);
+
+/* 파일 전송에 문제가 생겨 다시 해결 중입니다!
+  var dataSet;
+  d3.json("network.json", function (error, d) {
+    if (error) throw error;
+    dataSet = d;
+  })
+  //alert(JSON.stringify(dataSet))
+*/
+
+var dataSet = { // 고속버스 운행시간 데이터
+  "nodes":[
+    {"name":"서울", "group":1},
+    {"name":"인천", "group":1},
+    {"name":"대전", "group":2},
+    {"name":"광주", "group":3},
+    {"name":"대구", "group":4},
+    {"name":"부산", "group":4}
+  ],
+  "links":[
+    {"source":0, "target":1, "weight":1},
+    {"source":0, "target":2, "weight":2},
+    {"source":0, "target":3, "weight":3.2},
+    {"source":0, "target":4, "weight":3.3},
+    {"source":0, "target":5, "weight":4},
+    {"source":1, "target":5, "weight":4.1},
+    {"source":2, "target":3, "weight":2.2},
+    {"source":2, "target":5, "weight":3},
+    {"source":3, "target":4, "weight":3},
+    {"source":4, "target":5, "weight":1.1},
+    {"source":5, "target":3, "weight":3.1}
+  ]
+}
+
+  var force = d3.layout.force() //force 레이아웃, v4부터는 d3.forceSimulation()으로 변화됨
+                .nodes(dataSet.nodes) //노드 : 이름, 그룹
+                .links(dataSet.links) //링크 : 시작 노드, 목표 노드, 가중값 (source0 = node1 의미)
+                .size([width, height])
+                .gravity(0.02) //중심에서 당기는 정도
+                .distance([100]) //엣지 길이
+                .charge([-100]) //노드기리 밀어내는 힘, 음수일수록 강함
+                .start();
+
+  var link = svg.selectAll("line") //엣지 : 링크 정보로 서로 연결하는 역할
+                .data(dataSet.links)
+                .enter()
+                .append("line")
+                .attr("class", "link")
+                .style("stroke-width", function (d) { return d.weight });
+
+  var node = svg.selectAll("circle") //노드
+                .data(dataSet.nodes)
+                .enter()
+                .append("g")
+                .attr("class", "node")
+                .call(force.drag);
+
+  node.append("circle")
+      .attr("r", 20)
+
+  node.append("text")
+      .attr("class", "text")
+      .attr("dx", 0)
+      .attr("dy", ".35em")
+      .text(function (d) { return d.name })
+
+  force.on("tick", function () { //틱 시뮬레이션
+    link.attr("x1", function (d) { return d.source.x; })
+        .attr("y1", function (d) { return d.source.y; })
+        .attr("x2", function (d) { return d.target.x; })
+        .attr("y2", function (d) { return d.target.x; })
+
+    node.attr("transform", function (d) { return "translate(" + d.x + "," + d.y + ")"; })
+  })
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,302 @@
+<html>
+<head>
+  <title> Hierarchy Data Visualization </title>
+  <style>
+  .node {
+     fill: skyblue;
+     stroke: grey;
+   }
+   .link {
+     fill: none;
+     stroke: #ccc;
+     stroke-width: 2px;
+   }
+   .name {
+     font-size: 10pt;
+     text-anchor: middle;
+     fill:black;
+   }
+  </style>
+  <script src="http://d3js.org/d3.v4.min.js"></script>
+</head>
+
+<body>
+  <table>
+    <tr>
+      <h2> data : 서울시 인구밀도(명/km^2) </h2>
+      <td>
+        <h3> ① 트리 그래프 </h3>
+        <svg id="tree" width="500" height="400">
+          <g transform="translate(5,5)">
+            <g class="links"></g>
+            <g class="nodes"></g>
+          </g>
+        </svg><br>
+        <span style="color:red;"> ※ 같은 깊이의 노드를 같은 계층에 위치시킴. </span><br><br><br>
+      </td>
+      <td>
+        <h3> ② 클러스터 그래프 </h3>
+        <svg id="cluster" width="500" height="400">
+          <g transform="translate(5,5)">
+            <g class="links2"></g>
+            <g class="nodes2"></g>
+          </g>
+        </svg><br>
+        <span style="color:red;"> ※ leaf 노드를 맨 아래 계층에 위치시킴. </span><br><br><br>
+      </td>
+      <td>
+        <h3> ③ 트리맵 그래프 </h3>
+        <svg id="treemap" width="500" height="400">
+          <g transform="translate(5,5)">
+            <g class="nodes3"></g>
+          </g>
+        </svg><br>
+        <span style="color:red;"> ※ 각 자식 노드의 합계에 따라 사각형이 비례함. </span><br><br><br>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <h3> ④ 팩 그래프 </h3>
+        <svg id="pack" width="500" height="300">
+          <g transform="translate(5,5)">
+            <g class="nodes4"></g>
+          </g>
+        </svg><br>
+        <span style="color:red;"> ※ 각 노드를 원으로 분할. </span><br><br><br>
+      </td>
+      <td>
+        <h3> ⑤ 파티션 그래프 </h3>
+        <svg id="partition" width="500" height="300">
+          <g transform="translate(5,5)">
+            <g class="nodes5"></g>
+          </g>
+        </svg><br>
+        <span style="color:red;"> ※ 각 파티션을 직사각형으로 분할. </span><br><br><br>
+      </td>
+      <td>
+        <h3> ⑥ 선버스트 그래프 </h3>
+        <svg id="sunburst" width="500" height="300">
+          <g transform="translate(250,150)">
+            <g class="nodes6"></g>
+          </g>
+        </svg><br>
+        <span style="color:red;"> ※ 각 파티션을 원으로 분할. </span><br><br><br>
+      </td>
+    </tr>
+  </table>
+
+  <script>
+  //서울시 인구밀도 자료
+  var data = {
+    "name": "서울시", "value":16728,
+    "children": [{"name": "동작구", "value": 24978,
+                 "children": [{"name": "상도1동", "value":32100},
+                              {"name": "상도2동", "value":28111},
+                              {"name": "상도3동", "value":43840},
+                              {"name": "상도4동", "value":40476}]},
+                {"name": "관악구", "value":17617},
+                {"name": "서초구", "value":9480},
+                {"name": "강남구", "value":14203},
+                {"name": "송파구", "value":19813}]
+              }
+  var root = d3.hierarchy(data) //계층적 객체 만들기
+
+  //1. 트리 그래프
+  var svg1 = d3.select("#tree");
+  var treeLayout = d3.tree() //트리 객체
+                     .size([500,250])
+  treeLayout(root) //뿌리 전달
+
+  var margin = 80; //root 노드가 잘보이도록 하기 위한 여백
+  d3.select("svg g.nodes") //노드
+    .selectAll("circle.node")
+    .data(root.descendants()) //root 노드의 후손 전달
+    .enter()
+    .append("circle")
+    .classed("node", true)
+    .attr("cx", function(d) { return d.x; })
+    .attr("cy", function(d) { return d.y + margin; })
+    .attr("r", function(d) { return d.value / 1000; })
+    .style("fill", "yellow");
+
+  d3.select("svg g.links") //링크
+    .selectAll("line.link")
+    .data(root.links()) //부모-자식 링크 전달
+    .enter()
+    .append("line")
+    .classed("link", true)
+    .attr("x1", function(d) {return d.source.x;})
+    .attr("y1", function(d) {return d.source.y + margin;})
+    .attr("x2", function(d) {return d.target.x;})
+    .attr("y2", function(d) {return d.target.y + margin;})
+
+  for(var i=0; i<root.descendants().length; i++) { //각 노드 이름 붙이기
+    tx = root.descendants()[i].x;
+    ty = root.descendants()[i].y + margin/2;
+    svg1.append("text")
+       .attr("class","name")
+       .attr("x", tx)
+       .attr("y", ty)
+       .text(root.descendants()[i].data.name)
+  }
+
+  //2. 클러스터 그래프
+  var svg2 = d3.select("#cluster");
+  var clusterLayout = d3.cluster() //클러스터 객체
+                        .size([500, 250])
+  clusterLayout(root)
+
+  d3.select("svg g.nodes2") //노드
+    .selectAll("circle.node")
+    .data(root.descendants()) //root 노드의 후손 전달
+    .enter()
+    .append("circle")
+    .classed("node", true)
+    .attr("cx", function(d) { return d.x; })
+    .attr("cy", function(d) { return d.y + margin; })
+    .attr("r", function(d) { return d.value / 1000; })
+    .style("fill", "yellow");
+
+  d3.select("svg g.links2") //링크
+    .selectAll("line.link")
+    .data(root.links()) //부모-자식 링크 전달
+    .enter()
+    .append("line")
+    .classed("link", true)
+    .attr("x1", function(d) {return d.source.x;})
+    .attr("y1", function(d) {return d.source.y + margin;})
+    .attr("x2", function(d) {return d.target.x;})
+    .attr("y2", function(d) {return d.target.y + margin;});
+
+  for(var i=0; i<root.descendants().length; i++) { //각 노드 이름 붙이기
+    tx = root.descendants()[i].x;
+    ty = root.descendants()[i].y + margin/2;
+    svg2.append("text")
+       .attr("class","name")
+       .attr("x", tx)
+       .attr("y", ty)
+       .text(root.descendants()[i].data.name)
+  }
+
+  //3. 트리맵 그래프
+  var svg3 = d3.select("#treemap");
+  var treemapLayout = d3.treemap() //트리맵 객체
+                        .size([450, 250])
+                        .paddingOuter(20); //사각형 바깥 여백
+
+  var root2 = d3.hierarchy(data) //계층적 객체2 만들기
+  root2.sum(function (d) { return d.value; }) //자식 노드의 합 계산
+  treemapLayout(root2)
+
+  d3.select("svg g.nodes3") //노드
+    .selectAll("rect")
+    .data(root2.descendants()) //root 노드의 후손 전달
+    .enter()
+    .append("rect")
+    .attr("x", function(d) { return d.x0; })
+    .attr("y", function(d) { return d.y0; })
+    .attr("width", function(d) { return d.x1-d.x0; })
+    .attr("heith", function(d) { return d.y1-d.y0; })
+
+  var nodes_tm = d3.select('svg g.nodes3')
+                   .selectAll("g")
+                   .data(root2.descendants())
+                   .enter()
+                   .append('g')
+                   .attr('transform', function (d) { return 'translate('+[d.x0, d.y0]+')'})
+
+  nodes_tm.append('rect')
+          .attr('width', function (d) { return d.x1-d.x0; })
+          .attr('height', function (d) { return d.y1-d.y0; })
+          .attr("stroke", "black")
+          .attr("fill", "yellow");
+
+  nodes_tm.append('text') //각 노드 이름 붙이기
+          .attr('dx', 5) //text 위치
+          .attr('dy', 15)
+          .attr('font-size', '12px')
+          .text(function (d) { return d.data.name; })
+
+
+  //4. 팩 그래프
+  var svg4 = d3.select("#pack");
+  var packLayout = d3.pack() //팩 객체
+                     .size([500, 250])
+                     .padding(20);
+  packLayout(root2)
+
+  var nodes_p = d3.select('svg g.nodes4')
+                .selectAll("g")
+                .data(root2.descendants())
+                .enter()
+                .append('g')
+                .attr('transform', function (d) { return 'translate('+[d.x, d.y]+')'})
+
+  nodes_p.append('circle')
+         .attr('r', function (d) { return d.r; })
+         .attr("stroke", "black")
+         .attr("fill", "yellow")
+
+  nodes_p.append('text') //각 노드 이름 붙이기
+         .attr('dx', -5) //text 위치
+         .attr('dy', 5)
+         .attr('font-size', '12px')
+         .text(function (d) { return d.data.name; })
+
+  //5. 파티션 그래프
+  var svg5 = d3.select("#partition");
+  var partitionLayout = d3.partition() //파티션 객체
+                          .size([500, 250])
+                          .padding(20);
+  partitionLayout(root2)
+
+  var nodes_pt = d3.select('svg g.nodes5')
+                .selectAll("rect")
+                .data(root2.descendants())
+                .enter()
+                .append('g')
+
+  nodes_pt.append('rect')
+          .attr('x', function (d) { return d.x0; })
+          .attr('y', function (d) { return d.y0; })
+          .attr('width', function (d) { return d.x1-d.x0; })
+          .attr('height', function (d) { return d.y1-d.y0; })
+          .attr("stroke", "black")
+          .attr("fill", "yellow");
+
+  nodes_pt.append('text') //각 노드 이름 붙이기
+          .attr("x", function(d) { return d.x0 + 5; })
+          .attr("y", function(d) { return d.y0 + 20; })
+          .text(function (d) { return d.data.name; })
+
+  //6. 선버스트 그래프
+  var svg6 = d3.select("#sunburst");
+  var radius = 120; //반지름
+  var partitionLayout2 = d3.partition() //파티션2 객체
+                           .size([2*Math.PI, radius]);
+  partitionLayout2(root2)
+
+  var arcGenerator = d3.arc()
+                       .startAngle(function (d) { return d.x0; }) //회전각도
+                       .endAngle(function (d) { return d.x1; })
+                       .innerRadius(function (d) { return d.y0; }) //반지름
+                       .outerRadius(function (d) { return d.y1; })
+
+  var nodes_s = d3.select('svg g.nodes6')
+                  .selectAll("path")
+                  .data(root2.descendants())
+                  .enter()
+                  .append('path')
+                  .attr('d', arcGenerator)
+                  .attr("stroke", "black")
+                  .attr("fill", "yellow");
+
+  nodes_s.append('text') //각 노드 이름 붙이기
+         .attr("x", 5)
+         .attr("y", 5)
+         .attr("dy", 15)
+         .text(function (d) { return d.data.label; })
+
+   </script>
+ </body>
+ </html>

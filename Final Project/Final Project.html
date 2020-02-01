@@ -1,0 +1,842 @@
+<html>
+<head>
+  <meta charset="utf-8">
+  <title> Trend Storytelling Web </title>
+  <style>
+  body {
+    background-image: url("image.jpg");
+    background-repeat: no-repeat;
+    background-size: cover;
+    font-family: HY수평선M;
+  }
+  .tab {
+    white-space: pre;
+  }
+  .right {
+    text-align: right;
+  }
+  ul li {
+    width:250px;
+    height:70px;
+    border:1px solid white;
+    background-color: rgba(255, 255, 255, 0);
+    list-style: none;
+    text-align: center;
+    line-height: 70px;
+    vertical-align: middle;
+    color: white;
+    font-size: 20px;
+  }
+  ul li:hover {
+    background-color: rgba(0, 0, 0, 0.2);
+  }
+  .active {
+    background-color: rgba(0, 0, 0, 0.2);
+  }
+  .area.hover {
+    stroke: black;
+    stroke-width: 4;
+  }
+  .day {
+    fill: #fff;
+    stroke: #ccc;
+  }
+  .day.hover {
+    stroke: black;
+    stroke-width: 3;
+  }
+  .month {
+    fill: none;
+    stroke: #000;
+    stroke-width: 2px;
+  }
+  .freq .q0{ fill:#FFFFFF }
+  .freq .q1{ fill:#FBEFEF }
+  .freq .q2{ fill:#F8E0E0 }
+  .freq .q3{ fill:#F6CECE }
+  .freq .q4{ fill:#F5A9A9 }
+  .freq .q5{ fill:#F78181 }
+  .freq .q6{ fill:#FA5858 }
+  .freq .q7{ fill:#FF0000 }
+  .freq .q8{ fill:#DF0101 }
+  .freq .q9{ fill:#8A0808 }
+
+  </style>
+
+  <script src="http://d3js.org/d3.v4.min.js"></script>
+  <script src="http://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+</head>
+
+<body>
+  <div style="width:850px; height:100px; margin:auto; padding:15px;
+  background-color: rgba(0, 0, 0, 0.2); color:#E6E6E6; font-size:15px; font-family:sans-serif;">
+    본 페이지는 실시간 인기검색어를 차트 형식으로 제공해주는 기존 방식에서 벗어나
+    <br>검색어 트렌드를 사용자에게 시각적으로 전달해주기 위해 고안된 'Trend Story-telling' 페이지입니다.
+    <br>사용자는 실시간 인기검색어뿐만 아니라 과거의 인기검색어와 연관지어 현재 트렌드를 파악할 수 있으며
+    <br>그래프를 통해 트렌드 등장 시점, 주로 검색되는 날짜 및 요일 등의 세부정보까지 파악할 수 있습니다.
+    <br>※ 페이지에서 사용된 데이터는 네이버 데이터랩(https://datalab.naver.com/)에 공개된 검색어 데이터임을 알려드립니다.
+  </div><br>
+
+  <span style="color:black; font-size:17px;"> 2018/01/01 ~ 12/31 검색어 트렌드 살펴보기</span><br>
+  <ul style="margin:20px; float:left;">
+    <li id="menu1" onclick=menu(1)> 패션 의류 </li>
+    <li id="menu2" onclick=menu(2)> 스포츠 / 레저 </li>
+    <li id="menu3" onclick=menu(3)> 생활 / 건강 </li>
+  </ul><br>
+
+  <div id="wrap" style="width:1480px; height:1250px; display: none; padding:20px; background-color: rgba(0, 0, 0, 0.2); float:left;">
+    <div id="StreamGraph" style="width:1400px; height:500px;">
+      <span style="font-size:30px; color:white;"> ① Stream Graph </span>
+      <span style="font-size:17px; color:#D8D8D8;"> - 그래프 위에 마우스를 대면 해당 검색어를 알 수 있습니다. </span>
+    </div>
+    <div class="right">
+      <span class="tab" style="font-size:17px; color:#D8D8D8;">
+        <b> ※ 보는 방법 </b>: 아래쪽에 있을 수록 검색 순위가 높으며, 면적이 넓을수록 사용자들의 관심이 높았던 검색어입니다.
+      </span><br><br><br>
+    </div>
+
+    <div id="CalenderHeatmap" style="width:1400px; height:550px;">
+      <span style="font-size:30px; color:white;"> ② Calender Heatmap </span>
+      <span style="font-size:17px; color:#D8D8D8;"> - 그래프 위에 마우스를 대면 해당 날짜, 검색어 클릭량을 알 수 있습니다. </span><br><br><br>
+    </div>
+    <div class="right">
+      <span class="tab" style="font-size:17px; color:#D8D8D8;">
+        <b> ※ 보는 방법 </b>: 진한 색일수록 사용자들의 클릭 수가 높았던 검색어입니다.
+      </span><br>
+    </div>
+  </div>
+
+  <script>
+  //중복제거 함수
+  function unique(arr) {
+    var res = []
+    for (var i=0; i<arr.length; i++) {
+      if (res.indexOf(arr[i]) == -1) { //-1:없음
+        res.push(arr[i])
+      }
+    }
+    return res
+  }
+
+  //스트림 그래프 변수
+  var width = 1400;
+  var height1 = 450;
+  var margin = 50;
+
+  var svg1 = d3.select("#StreamGraph")
+               .append("svg")
+               .attr("width", width)
+               .attr("height", height1)
+
+  //캘린더 히트맵 변수
+  var height2 = 350;
+  var cellSize_w = 22;
+  var cellSize = 16;
+
+  //format 지정
+  var percent = d3.format("0.1%");
+  var format = d3.timeFormat("%Y-%m-%d");
+
+  //영역별 color 할당
+  var color2 = d3.scaleQuantize()
+                 .domain([0, 101])
+                 .range(d3.range(10).map(function(d) { return "q" + d; }));
+
+  //월별 외곽선 함수
+  function monthPath(t0) {
+    var t1 = new Date(t0.getFullYear(), t0.getMonth() + 1, 0),
+        d0 = t0.getDay(), w0 = d3.timeWeek.count(d3.timeYear(t0), t0)
+        d1 = t1.getDay(), w1 = d3.timeWeek.count(d3.timeYear(t1), t1);
+    return "M" + (w0 + 1) * cellSize_w + "," + d0 * cellSize
+        + "H" + w0 * cellSize_w + "V" + 7 * cellSize
+        + "H" + w1 * cellSize_w + "V" + (d1 + 1) * cellSize
+        + "H" + (w1 + 1) * cellSize_w + "V" + 0
+        + "H" + (w0 + 1) * cellSize_w + "Z";
+  };
+
+
+  //메뉴 선택시 배경색 변경
+  $('ul').on('click', 'li', function () {
+    $(this).parent().children().removeClass('active');
+    $(this).addClass('active');
+  });
+
+  function menu(n) {
+    document.getElementById('wrap').style.display = "inline-block";
+    $("#StreamGraph > svg").empty(); //svg 요소 삭제
+    $("#CalenderHeatmap").children("svg").remove();
+
+    //캘린더 히트맵 기본틀
+    var months = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월','9월', '10월', '11월', '12월']
+    var svg_m = d3.select("#CalenderHeatmap")
+                  .append("svg")
+                  .attr("width", width)
+                  .attr("height", 30)
+                  .append("g")
+                  .attr("transform", "translate(200, -15)");
+
+    for (var i=0; i<12; i++) {
+      svg_m.append("text")
+           .style("text-anchor", "middle")
+           .style("font-size", "15px")
+           .style("fill", "#81BEF7")
+           .text(function(d) { return months[i]})
+           .attr("transform", "translate(" + i*95 + ", 30)")
+    }
+
+    //1위
+    var svg_r1 = d3.select("#CalenderHeatmap")
+                   .append("svg")
+                   .attr("width", width)
+                   .attr("height", height2/3 + 30)
+                   .attr("class", "freq")
+                   .append("g")
+                   .attr("transform", "translate(150, 0)");
+
+    svg_r1.append("text")
+          .attr("transform", "translate(-90, 60)")
+          .style("text-anchor", "middle")
+          .style("font-size", "25px")
+          .style("fill", "#FE2E2E")
+          .text("1위");
+
+    //2위
+    var svg_r2 = d3.select("#CalenderHeatmap")
+                   .append("svg")
+                   .attr("width", width)
+                   .attr("height", height2/3 + 30)
+                   .attr("class", "freq")
+                   .append("g")
+                   .attr("transform", "translate(150, 0)");
+
+    svg_r2.append("text")
+          .attr("transform", "translate(-90, 60)")
+          .style("text-anchor", "middle")
+          .style("font-size", "25px")
+          .style("fill", "#F78181")
+          .text("2위");
+
+    //3위
+    var svg_r3 = d3.select("#CalenderHeatmap")
+                   .append("svg")
+                   .attr("width", width)
+                   .attr("height", height2/3 + 30)
+                   .attr("class", "freq")
+                   .append("g")
+                   .attr("transform", "translate(150, 0)");
+
+    svg_r3.append("text")
+          .attr("transform", "translate(-90, 60)")
+          .style("text-anchor", "middle")
+          .style("font-size", "25px")
+          .style("fill", "#F6CECE")
+          .text("3위");
+
+    //요일
+    var days = ["일", "월", "화", "수", "목", "금", "토"]
+    for (var i=0; i<7; i++) {
+      svg_r1.append("text")
+             .style("text-anchor", "middle")
+             .style("font-size", "13px")
+             .text(function(d) { return days[i]})
+             .attr("transform", "translate(-20," + ((i+1)*16-3) + ")")
+
+      svg_r2.append("text")
+            .style("text-anchor", "middle")
+            .style("font-size", "13px")
+            .text(function(d) { return days[i]})
+            .attr("transform", "translate(-20," + ((i+1)*16-3) + ")")
+
+      svg_r3.append("text")
+            .style("text-anchor", "middle")
+            .style("font-size", "13px")
+            .text(function(d) { return days[i]})
+            .attr("transform", "translate(-20," + ((i+1)*16-3) + ")")
+    }
+
+    var startDate = new Date(2017, 12, 1)
+    var endDate = new Date(2018, 12, 1)
+
+    //1위 map
+    var rect_r1 = svg_r1.selectAll(".day")
+                        .data(d3.timeDays(startDate, endDate))
+                        .enter()
+                        .append("rect")
+                        .attr("class", "day")
+                        .attr("width", cellSize_w)
+                        .attr("height", cellSize)
+                        .attr("x", function(d) { return d3.timeWeek.count(d3.timeYear(d), d) * cellSize_w; })
+                        .attr("y", function(d) { return d.getDay() * cellSize; })
+                        .on("mouseover", function(d) {
+                          d3.select(this).classed('hover', true);
+                        })
+                        .on("mouseout", function(d) {
+                          d3.select(this).classed('hover', false);
+                        })
+                        .datum(format);
+
+    rect_r1.append("title")
+           .text(function(d) { return d; });
+
+    svg_r1.selectAll(".month")
+          .data(d3.timeMonths(startDate, endDate))
+          .enter()
+          .append("path")
+          .attr("class", "month")
+          .attr("d", monthPath)
+
+    //2위 map
+    var rect_r2 = svg_r2.selectAll(".day")
+                        .data(d3.timeDays(startDate, endDate))
+                        .enter()
+                        .append("rect")
+                        .attr("class", "day")
+                        .attr("width", cellSize_w)
+                        .attr("height", cellSize)
+                        .attr("x", function(d) { return d3.timeWeek.count(d3.timeYear(d), d) * cellSize_w; })
+                        .attr("y", function(d) { return d.getDay() * cellSize; })
+                        .on("mouseover", function(d) {
+                          d3.select(this).classed('hover', true);
+                        })
+                        .on("mouseout", function(d) {
+                          d3.select(this).classed('hover', false);
+                        })
+                        .datum(format);
+
+    rect_r2.append("title")
+           .text(function(d) { return d; });
+
+    svg_r2.selectAll(".month")
+          .data(d3.timeMonths(startDate, endDate))
+          .enter()
+          .append("path")
+          .attr("class", "month")
+          .attr("d", monthPath)
+
+    //3위 map
+    var rect_r3 = svg_r3.selectAll(".day")
+                        .data(d3.timeDays(startDate, endDate))
+                        .enter()
+                        .append("rect")
+                        .attr("class", "day")
+                        .attr("width", cellSize_w)
+                        .attr("height", cellSize)
+                        .attr("x", function(d) { return d3.timeWeek.count(d3.timeYear(d), d) * cellSize_w; })
+                        .attr("y", function(d) { return d.getDay() * cellSize; })
+                        .on("mouseover", function(d) {
+                          d3.select(this).classed('hover', true);
+                        })
+                        .on("mouseout", function(d) {
+                          d3.select(this).classed('hover', false);
+                        })
+                        .datum(format);
+
+    rect_r3.append("title")
+           .text(function(d) { return d; });
+
+    svg_r3.selectAll(".month")
+          .data(d3.timeMonths(startDate, endDate))
+          .enter()
+          .append("path")
+          .attr("class", "month")
+          .attr("d", monthPath)
+
+    //패션 의류
+    if (n == 1) {
+
+      //스트림 그래프
+      d3.csv("패션의류.csv", function(data) {
+        var keys = data.columns.slice(1) //1번째 이후부터 복사
+
+        //x축
+        var x = d3.scaleLinear()
+                  .domain(d3.extent(data, function(d) { return d.mon; })) //[최대, 최소] 반환
+                  .range([margin, width-margin*8]);
+
+        var x_info = d3.scaleLinear()
+                       .domain([1, 12])
+                       .range([margin, 1355])
+
+        svg1.append("g")
+            .attr("transform", "translate(0," + (height1-margin/2) + ")")
+            .style("font-size", "17px")
+            .call(d3.axisBottom(x_info).ticks(12));
+
+        svg1.append("text")
+            .text("(월)")
+            .attr("x", 1370)
+            .attr("y", 447);
+
+        //y 축
+        var y = d3.scaleLinear()
+                  .domain([0, 35000])
+                  .range([height1, margin]);
+
+        svg1.append("g")
+            .attr("transform", "translate(" + margin + "," + -margin/2 + ")")
+            .call(d3.axisLeft(y));
+
+        //path를 채울 색 팔레트
+        var color = d3.scaleOrdinal()
+                      .domain(keys)
+                      .range(['#FF0000','#FF8000','#FFBF00','#FFFF00','#BFFF00',
+                      '#00FF00','#04B404', '#00FFFF', '#0080FF', '#0000FF',
+                      '#29088A', '#8000FF', '#FF00FF', '#FF0080', '#D8D8D8'])
+
+        //각 color 대입을 위한 data stack 작업
+        var stackedData = d3.stack()
+                            .keys(keys)(data)
+
+        //영역 그리기
+        svg1.selectAll("#StreamGraph")
+           .data(stackedData)
+           .enter()
+           .append("path")
+           .style("fill", function(d) { return color(d.key); })
+           .attr("d", d3.area()
+             .x(function(d, i) { return x(d.data.mon); })
+             .y0(function(d) { return y(d[0]); })
+             .y1(function(d) { return y(d[1]); })
+           )
+           .attr("transform", "translate(0," + -margin/2 + ")")
+           .attr("class", "area")
+           .on("mouseover", function(d) {
+             d3.select(this).classed('hover', true);
+           })
+           .on("mouseout", function(d) {
+             d3.select(this).classed('hover', false);
+           })
+
+        //해당 검색어 보여주기
+        var keyword = svg1.selectAll(".area")
+                          .data(keys)
+        keyword.append("title")
+               .text(function(d) { return d; });
+      });
+
+      //캘린더 히트맵 채우기
+      d3.csv("패션의류_top3.csv", function(error, csv) {
+        if (error) throw error;
+
+        //1위 key-value
+        var data1 = d3.nest() //data를 트리 구조로 변환
+                      .key(function(d) { return d.Date; })
+                      .rollup(function(d) { return d[0].value1; })
+                      .map(csv);
+        //alert(JSON.stringify(data1)) //데이터 형태 확인
+
+        rect_r1.filter(function(d) { return data1.has(d); })
+               .attr("class", function(d) { return "day " + color2(data1.get(d)); })
+               .select("title")
+               .text(function(d) { return d + ": " + percent(data1.get(d)/100); });
+
+        var rankword1 = [];
+        for (var i=0; i<365; i++) {
+          var tmp = csv[i].Date
+          if (tmp[8]+tmp[9] == "01") { //매달 1일 key 추출
+            rankword1.push(csv[i].key1)
+          }
+        }
+        //alert(JSON.stringify(rankword)) //확인
+
+        for (var i=0; i<12; i++) {
+          svg_r1.append("text")
+                .style("text-anchor", "middle")
+                .style("font-size", "12px")
+                .style("fill", "#D8D8D8")
+                .text(function(d) { return rankword1[i]})
+                .attr("transform", "translate(" + (50 + i*95) + ", 135)")
+        }
+
+        //2위 key-value
+        var data2 = d3.nest() //data를 트리 구조로 변환
+                      .key(function(d) { return d.Date; })
+                      .rollup(function(d) { return d[0].value2; })
+                      .map(csv);
+
+        rect_r2.filter(function(d) { return data2.has(d); })
+               .attr("class", function(d) { return "day " + color2(data2.get(d)); })
+               .select("title")
+               .text(function(d) { return d + ": " + percent(data2.get(d)/100); });
+
+        var rankword2 = [];
+        for (var i=0; i<365; i++) {
+         var tmp = csv[i].Date
+         if (tmp[8]+tmp[9] == "01") { //매달 1일 key 추출
+           rankword2.push(csv[i].key2)
+         }
+        }
+
+        for (var i=0; i<12; i++) {
+          svg_r2.append("text")
+                .style("text-anchor", "middle")
+                .style("font-size", "12px")
+                .style("fill", "#D8D8D8")
+                .text(function(d) { return rankword2[i]})
+                .attr("transform", "translate(" + (50 + i*95) + ", 135)")
+        }
+
+        //3위 key-value
+        var data3 = d3.nest() //data를 트리 구조로 변환
+                      .key(function(d) { return d.Date; })
+                      .rollup(function(d) { return d[0].value3; })
+                      .map(csv);
+
+        rect_r3.filter(function(d) { return data3.has(d); })
+               .attr("class", function(d) { return "day " + color2(data3.get(d)); })
+               .select("title")
+               .text(function(d) { return d + ": " + percent(data3.get(d)/100); });
+
+        var rankword3 = [];
+        for (var i=0; i<365; i++) {
+         var tmp = csv[i].Date
+         if (tmp[8]+tmp[9] == "01") { //매달 1일 key 추출
+           rankword3.push(csv[i].key3)
+         }
+        }
+
+        for (var i=0; i<12; i++) {
+          svg_r3.append("text")
+                .style("text-anchor", "middle")
+                .style("font-size", "12px")
+                .style("fill", "#D8D8D8")
+                .text(function(d) { return rankword3[i]})
+                .attr("transform", "translate(" + (50 + i*95) + ", 135)")
+        }
+      });
+    }
+
+    //스포츠/레저
+    else if (n == 2) {
+
+      //스트림 그래프
+      d3.csv("스포츠레저.csv", function(data) {
+        var keys = data.columns.slice(1) //1번째 이후부터 복사
+
+        //x축
+        var x = d3.scaleLinear()
+                  .domain(d3.extent(data, function(d) { return d.mon; })) //[최대, 최소] 반환
+                  .range([margin, width-margin*8]);
+
+        var x_info = d3.scaleLinear()
+                       .domain([1, 12])
+                       .range([margin, 1355])
+
+        svg1.append("g")
+            .attr("transform", "translate(0," + (height1-margin/2) + ")")
+            .style("font-size", "17px")
+            .call(d3.axisBottom(x_info).ticks(12));
+
+        svg1.append("text")
+            .text("(월)")
+            .attr("x", 1370)
+            .attr("y", 447);
+
+        //y 축
+        var y = d3.scaleLinear()
+                  .domain([0, 35000])
+                  .range([height1, margin]);
+
+        svg1.append("g")
+            .attr("transform", "translate(" + margin + "," + -margin/2 + ")")
+            .call(d3.axisLeft(y));
+
+        //path를 채울 색 팔레트
+        var color = d3.scaleOrdinal()
+                      .domain(keys)
+                      .range(['#FF0000','#FF8000','#FFBF00','#FFFF00','#BFFF00',
+                      '#00FF00','#04B404', '#00FFFF', '#0080FF', '#0000FF',
+                      '#29088A', '#8000FF', '#FF00FF', '#FF0080', '#D8D8D8'])
+
+        //각 color 대입을 위한 data stack 작업
+        var stackedData = d3.stack()
+                            .keys(keys)(data)
+
+        //영역 그리기
+        svg1.selectAll("#StreamGraph")
+           .data(stackedData)
+           .enter()
+           .append("path")
+           .style("fill", function(d) { return color(d.key); })
+           .attr("d", d3.area()
+             .x(function(d, i) { return x(d.data.mon); })
+             .y0(function(d) { return y(d[0]); })
+             .y1(function(d) { return y(d[1]); })
+           )
+           .attr("transform", "translate(0," + -margin/2 + ")")
+           .attr("class", "area")
+           .on("mouseover", function(d) {
+             d3.select(this).classed('hover', true);
+           })
+           .on("mouseout", function(d) {
+             d3.select(this).classed('hover', false);
+           })
+
+        //해당 검색어 보여주기
+        var keyword = svg1.selectAll(".area")
+                          .data(keys)
+        keyword.append("title")
+               .text(function(d) { return d; });
+      });
+
+      //캘린더 히트맵 채우기
+      d3.csv("스포츠레저_top3.csv", function(error, csv) {
+        if (error) throw error;
+
+        //1위 key-value
+        var data1 = d3.nest() //data를 트리 구조로 변환
+                      .key(function(d) { return d.Date; })
+                      .rollup(function(d) { return d[0].value1; })
+                      .map(csv);
+        //alert(JSON.stringify(data1)) //데이터 형태 확인
+
+        rect_r1.filter(function(d) { return data1.has(d); })
+               .attr("class", function(d) { return "day " + color2(data1.get(d)); })
+               .select("title")
+               .text(function(d) { return d + ": " + percent(data1.get(d)/100); });
+
+        var rankword1 = [];
+        for (var i=0; i<365; i++) {
+          var tmp = csv[i].Date
+          if (tmp[8]+tmp[9] == "01") { //매달 1일 key 추출
+            rankword1.push(csv[i].key1)
+          }
+        }
+        //alert(JSON.stringify(rankword)) //확인
+
+        for (var i=0; i<12; i++) {
+          svg_r1.append("text")
+                .style("text-anchor", "middle")
+                .style("font-size", "10px")
+                .style("fill", "#D8D8D8")
+                .text(function(d) { return rankword1[i]})
+                .attr("transform", "translate(" + (50 + i*95) + ", 135)")
+        }
+
+        //2위 key-value
+        var data2 = d3.nest() //data를 트리 구조로 변환
+                      .key(function(d) { return d.Date; })
+                      .rollup(function(d) { return d[0].value2; })
+                      .map(csv);
+
+        rect_r2.filter(function(d) { return data2.has(d); })
+               .attr("class", function(d) { return "day " + color2(data2.get(d)); })
+               .select("title")
+               .text(function(d) { return d + ": " + percent(data2.get(d)/100); });
+
+        var rankword2 = [];
+        for (var i=0; i<365; i++) {
+         var tmp = csv[i].Date
+         if (tmp[8]+tmp[9] == "01") { //매달 1일 key 추출
+           rankword2.push(csv[i].key2)
+         }
+        }
+
+        for (var i=0; i<12; i++) {
+          svg_r2.append("text")
+                .style("text-anchor", "middle")
+                .style("font-size", "10px")
+                .style("fill", "#D8D8D8")
+                .text(function(d) { return rankword2[i]})
+                .attr("transform", "translate(" + (50 + i*95) + ", 135)")
+        }
+
+        //3위 key-value
+        var data3 = d3.nest() //data를 트리 구조로 변환
+                      .key(function(d) { return d.Date; })
+                      .rollup(function(d) { return d[0].value3; })
+                      .map(csv);
+
+        rect_r3.filter(function(d) { return data3.has(d); })
+               .attr("class", function(d) { return "day " + color2(data3.get(d)); })
+               .select("title")
+               .text(function(d) { return d + ": " + percent(data3.get(d)/100); });
+
+        var rankword3 = [];
+        for (var i=0; i<365; i++) {
+         var tmp = csv[i].Date
+         if (tmp[8]+tmp[9] == "01") { //매달 1일 key 추출
+           rankword3.push(csv[i].key3)
+         }
+        }
+
+        for (var i=0; i<12; i++) {
+          svg_r3.append("text")
+                .style("text-anchor", "middle")
+                .style("font-size", "10px")
+                .style("fill", "#D8D8D8")
+                .text(function(d) { return rankword3[i]})
+                .attr("transform", "translate(" + (50 + i*95) + ", 135)")
+        }
+      });
+    }
+
+    //생활/건강
+    else {
+
+      //스트림 그래프
+      d3.csv("생활건강.csv", function(data) {
+        var keys = data.columns.slice(1) //1번째 이후부터 복사
+
+        //x축
+        var x = d3.scaleLinear()
+                  .domain(d3.extent(data, function(d) { return d.mon; })) //[최대, 최소] 반환
+                  .range([margin, width-margin*8]);
+
+        var x_info = d3.scaleLinear()
+                       .domain([1, 12])
+                       .range([margin, 1355])
+
+        svg1.append("g")
+            .attr("transform", "translate(0," + (height1-margin/2) + ")")
+            .style("font-size", "17px")
+            .call(d3.axisBottom(x_info).ticks(12));
+
+        svg1.append("text")
+            .text("(월)")
+            .attr("x", 1370)
+            .attr("y", 447);
+
+        //y 축
+        var y = d3.scaleLinear()
+                  .domain([0, 35000])
+                  .range([height1, margin]);
+
+        svg1.append("g")
+            .attr("transform", "translate(" + margin + "," + -margin/2 + ")")
+            .call(d3.axisLeft(y));
+
+        //path를 채울 색 팔레트
+        var color = d3.scaleOrdinal()
+                      .domain(keys)
+                      .range(['#FF0000','#FF8000','#FFBF00','#FFFF00','#BFFF00',
+                      '#00FF00','#04B404', '#00FFFF', '#0080FF', '#0000FF',
+                      '#29088A', '#8000FF', '#FF00FF', '#FF0080', '#D8D8D8'])
+
+        //각 color 대입을 위한 data stack 작업
+        var stackedData = d3.stack()
+                            .keys(keys)(data)
+
+        //영역 그리기
+        svg1.selectAll("#StreamGraph")
+           .data(stackedData)
+           .enter()
+           .append("path")
+           .style("fill", function(d) { return color(d.key); })
+           .attr("d", d3.area()
+             .x(function(d, i) { return x(d.data.mon); })
+             .y0(function(d) { return y(d[0]); })
+             .y1(function(d) { return y(d[1]); })
+           )
+           .attr("transform", "translate(0," + -margin/2 + ")")
+           .attr("class", "area")
+           .on("mouseover", function(d) {
+             d3.select(this).classed('hover', true);
+           })
+           .on("mouseout", function(d) {
+             d3.select(this).classed('hover', false);
+           })
+
+        //해당 검색어 보여주기
+        var keyword = svg1.selectAll(".area")
+                          .data(keys)
+        keyword.append("title")
+               .text(function(d) { return d; });
+      });
+
+      //캘린더 히트맵 채우기
+      d3.csv("생활건강_top3.csv", function(error, csv) {
+        if (error) throw error;
+
+        //1위 key-value
+        var data1 = d3.nest() //data를 트리 구조로 변환
+                      .key(function(d) { return d.Date; })
+                      .rollup(function(d) { return d[0].value1; })
+                      .map(csv);
+        //alert(JSON.stringify(data1)) //데이터 형태 확인
+
+        rect_r1.filter(function(d) { return data1.has(d); })
+               .attr("class", function(d) { return "day " + color2(data1.get(d)); })
+               .select("title")
+               .text(function(d) { return d + ": " + percent(data1.get(d)/100); });
+
+        var rankword1 = [];
+        for (var i=0; i<365; i++) {
+          var tmp = csv[i].Date
+          if (tmp[8]+tmp[9] == "01") { //매달 1일 key 추출
+            rankword1.push(csv[i].key1)
+          }
+        }
+        //alert(JSON.stringify(rankword)) //확인
+
+        for (var i=0; i<12; i++) {
+          svg_r1.append("text")
+                .style("text-anchor", "middle")
+                .style("font-size", "10px")
+                .style("fill", "#D8D8D8")
+                .text(function(d) { return rankword1[i]})
+                .attr("transform", "translate(" + (50 + i*95) + ", 135)")
+        }
+
+        //2위 key-value
+        var data2 = d3.nest() //data를 트리 구조로 변환
+                      .key(function(d) { return d.Date; })
+                      .rollup(function(d) { return d[0].value2; })
+                      .map(csv);
+
+        rect_r2.filter(function(d) { return data2.has(d); })
+               .attr("class", function(d) { return "day " + color2(data2.get(d)); })
+               .select("title")
+               .text(function(d) { return d + ": " + percent(data2.get(d)/100); });
+
+        var rankword2 = [];
+        for (var i=0; i<365; i++) {
+         var tmp = csv[i].Date
+         if (tmp[8]+tmp[9] == "01") { //매달 1일 key 추출
+           rankword2.push(csv[i].key2)
+         }
+        }
+
+        for (var i=0; i<12; i++) {
+          svg_r2.append("text")
+                .style("text-anchor", "middle")
+                .style("font-size", "10px")
+                .style("fill", "#D8D8D8")
+                .text(function(d) { return rankword2[i]})
+                .attr("transform", "translate(" + (50 + i*95) + ", 135)")
+        }
+
+        //3위 key-value
+        var data3 = d3.nest() //data를 트리 구조로 변환
+                      .key(function(d) { return d.Date; })
+                      .rollup(function(d) { return d[0].value3; })
+                      .map(csv);
+
+        rect_r3.filter(function(d) { return data3.has(d); })
+               .attr("class", function(d) { return "day " + color2(data3.get(d)); })
+               .select("title")
+               .text(function(d) { return d + ": " + percent(data3.get(d)/100); });
+
+        var rankword3 = [];
+        for (var i=0; i<365; i++) {
+         var tmp = csv[i].Date
+         if (tmp[8]+tmp[9] == "01") { //매달 1일 key 추출
+           rankword3.push(csv[i].key3)
+         }
+        }
+
+        for (var i=0; i<12; i++) {
+          svg_r3.append("text")
+                .style("text-anchor", "middle")
+                .style("font-size", "10px")
+                .style("fill", "#D8D8D8")
+                .text(function(d) { return rankword3[i]})
+                .attr("transform", "translate(" + (50 + i*95) + ", 135)")
+        }
+      });
+    }
+  }
+
+  </script>
+</body>
+</html>

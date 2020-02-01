@@ -1,0 +1,87 @@
+<html>
+<head>
+  <title> wordcloud </title>
+  <style> </style>
+
+  <script src="http://d3js.org/d3.v3.min.js"></script>
+  <script src="https://rawgit.com/jasondavies/d3-cloud/master/build/d3.layout.cloud.js" type="text/JavaScript"></script>
+</head>
+
+<body style="text-align:center">
+  <h2> <워드 클라우드> </h2>
+
+  <script>
+
+  //크롬 - 크로스 도메일 확장 프로그램 설치
+  //크롬 아이콘 속성-대상위치에  --disable-web-security --user-data-dir="C:\chrome" 추가
+
+  var width = 500;
+  var height = 500;
+
+  var svg = d3.select("body")
+              .append("svg")
+              .attr("width", width)
+              .attr("height", height);
+
+  //비정형 텍스트 데이터를 txt로 읽어 공백 기준으로 split한 후, 기호 제거,
+  //단어 마지막에 조사(이,가,을,를,의,으로,에게,께,께서,와,과 등)가 붙어있으면 제거
+  //match 함수를 이용해 단어별(어간별) count 후 외부 파일로 저장
+  // > 위의 방법으로 비정형 데이터를 정형 데이터로 마이닝할 수 있음.
+  //   (외부 명사 추출기를 사용하려면 node.js를 이용해야함)
+
+  d3.csv("./worddata.csv", function (d) { //데이터
+    showCloud(d)
+    setInterval(function () { showCloud(d) }, 2000)
+  })
+
+  //단어 크기 스케일 지정
+  wordScale = d3.scale.linear().domain([0, 100]).range([0, 50]).clamp(true)
+  //domain을 넘어가면 최대값으로 고정
+
+  var keywords = ["데이터", "마이닝"]
+  var svg = d3.select("svg")
+              .append("g")
+              .attr("transform", "translate(" + width/2 + "," + height/2 + ")")
+
+  //워드 클라우드
+  function showCloud(data) {
+    d3.layout.cloud().size([width, height])
+      //클라우드 레이아웃에 데이터 전달
+      .words(data)
+      .rotate(function (d) { return d.text.length > 2 ? 0 : 90; })
+      //스케일로 각 단어의 크기를 설정
+      .fontSize(function (d) { return wordScale(d.frequency); })
+      //클라우드 레이아웃을 초기화 > end이벤트 발생 > 연결된 함수 작동
+      .on("end", draw)
+      .start();
+  }
+
+  function draw(words) {
+    var cloud = svg.selectAll("text").data(words)
+    //Entering words
+    cloud.enter()
+         .append("text")
+         .style("font-family", "overwatch")
+         .style("fill", function (d) {
+           return (keywords.indexOf(d.text) > -1 ? "#fbc280" : "#405275");
+         })
+         .style("fill-opacity", .5)
+         .attr("text-anchor", "middle")
+         .attr('font-size', 1)
+         .text(function (d) {
+           return d.text;
+         });
+    cloud.transition()
+         .duration(600)
+         .style("font-size", function (d) {
+           return d.size + "px";
+         })
+         .attr("transform", function (d) {
+           return "translate(" + [d.x, d.y] + ")rotate(" + d.rotate + ")";
+         })
+         .style("fill-opacity", 1);
+  }
+
+  </script>
+</body>
+</html>

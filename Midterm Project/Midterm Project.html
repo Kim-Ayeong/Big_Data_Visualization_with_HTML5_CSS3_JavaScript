@@ -1,0 +1,1198 @@
+﻿<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+  <title>
+    데이터 시각화
+  </title>
+
+  <style>
+    body {
+      text-align: center;
+      align-items: center;
+    }
+    svg {
+      border:1px solid black;
+    }
+    #Graph rect{
+      stroke:black;
+      stroke-width:2px;
+      fill:lightblue;
+      opacity:0.7;
+    }
+    #view_stat rect{
+      stroke:black;
+      stroke-width:1px;
+      fill:lightblue;
+      opacity:0.7;
+    }
+    .title {
+      font-size:15pt;
+      fill:red;
+    }
+    .barname {
+      font-size:12pt;
+    }
+    .frep {
+      fonr-size:9pt;
+      fill:red;
+    }
+    .axis text {
+      font-family: sans-serif;
+      font-size: 12px;
+    }
+    .axis path,
+    .axis line {
+      fill:none;
+      stroke-width:1px;
+      stroke:black;
+    }
+    ul li {
+      width:200px;
+      height:30px;
+      border:1px solid black;
+      background-color:#CEF6CE;
+      float: left;
+      vertical-align: middle;
+      list-style: none;
+    }
+    ul li:hover {
+      background-color: #82E0A3;
+    }
+    .active {
+      background-color: #82E0A3;
+    }
+
+  </style>
+  <script type="text/javascript" src="http://d3js.org/d3.v4.min.js"></script>
+  <script src="http://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+</head>
+
+<body>
+  <h2> csv 데이터 시각화 </h2>
+  <form>
+    <fieldset style="background-color:lightblue;"><br>
+      <input type="button" id="select_file" value="파일 선택">
+      <input type="file" accept=".csv" style="display:none" id="import_file">
+      <input type="text" id="filename"><br><br>
+    </fieldset>
+  <form><br>
+
+  <ul style="display:inline-block;">
+    <li id="freq_table" > 도수 분포표 </li>
+    <li id="statistics" > 기초 통계량 </li>
+    <li id="bargraph"> 막대 그래프 </li>
+    <li id="histogram"> 히스토그램 </li>
+    <li id="scatter"> 산점도 </li>
+    <li id="scat_matrix"> 산점도 행렬 </li>
+  </ul><br>
+
+  <div style="display:inline-block;">
+    <select id="combo1" style="display:none; width:200px;"> </select>
+    <select id="combo2" style="display:none; width:200px;"> </select> &nbsp;&nbsp;&nbsp;
+    <input type="button" id="select_var" style="display:none;" value="선택 완료" onclick=graph_btn()><br><br>
+  </div>
+
+  <div id='input_interval' style="display:none;">
+    구간 개수 :
+    <input type=text id="input1" style="width:200px;" value=""> &nbsp;&nbsp;&nbsp;
+    <input type=button value="입력 완료" onclick=hist_btn()><br>
+  </div><br>
+
+  <div style="width:700px; height:500px; border:1px solid black; overflow:auto; display:inline-block;" id="view_data"></div> &nbsp;&nbsp;&nbsp;
+
+  <div style="width:700px; height:500px; border:1px solid black; overflow:auto; display:inline-block;" id="view_stat"></div>
+  <svg style="width:700px; height:500px; border:1px solid black; display:none;" id="Graph"> </svg>
+  <input type="button" id="view_hist_stat" style="display:none;" value="구간별 도수 보기">
+  <p id=hist_text style="display:none;">※ 막대 위 숫자는 각 막대의 면적(가로X세로)입니다.</p>
+
+  <input type="button" id="regre" style="display:none;" value="회귀직선 추가"><br>
+  <input type="button" id="group" style="display:none;" value="그룹별 보기">
+  <select id="combo3" style="display:none; width:200px;"> </select>
+  <input type="button" id="select_group" style="display:none;" value="선택 완료">
+
+  <script>
+  //C 드라이브에 chrome 임시 폴더 생성
+  //크롬 브라우저-속성-대상위치에 --disable-web-security --user-data-dir="C:\chrome" 추가
+
+  //자료 수 함수
+  function count(array) {
+    var sum = 0;
+    for (i=0; i<array.length; i++) {
+      if (array[i] != null) {
+        sum ++;
+      }
+    }
+    return sum;
+  }
+
+  //합 함수
+  function sum(array) {
+    var sum = 0;
+    for (i=0; i<array.length; i++) {
+      sum += parseFloat(array[i])
+    }
+    return sum;
+  }
+
+  //누적합
+  function cumsum(array) {
+    var cumsum = new Array();
+    var sum = 0;
+    for (i=0; i<array.length; i++) {
+      sum += parseFloat(array[i])
+      cumsum.push(sum)
+    }
+    return cumsum
+  }
+
+  //평균 함수
+  function mean(array) {
+    return Math.floor(sum(array)/array.length*100)/100
+  }
+
+  //중앙값 함수
+  function median(array) {
+    array = array.sort()
+    var m;
+    if (array.length % 2 == 1) {
+      m = array[parseInt(array.length/2)]
+    } else {
+      m = (parseFloat(array[parseInt(array.length/2)]) + parseFloat(array[parseInt(array.length/2)+1])) / 2
+      m = Math.floor(m*100)/100
+    }
+    return m
+  }
+
+  //분산 함수
+  function dev(array) {
+    var m = mean(array)
+    var vsum = 0
+    for (i=0; i<array.length; i++) {
+      vsum += parseFloat((array[i]-m) * (array[i]-m))
+    }
+    return Math.floor(vsum/array.length*100)/100
+  }
+
+  //표준편차 함수
+  function sdd(array) {
+    return Math.floor(Math.sqrt(dev(array))*100)/100
+  }
+
+  //정규분포 함수
+  function normal(x, m, sd) {
+    var y = (1 / Math.sqrt(2*Math.PI)*sd) * Math.exp(-(x-m)*(x-m)/(2*sd*sd))
+    return y
+  }
+
+  //최소값 함수
+  function min(array) {
+    array = array.sort()
+    var ans = array[0]
+    for(i=1; array[i] != null; i++) {
+      if(array[i] < ans) {
+        ans = array[i]
+      }
+    }
+    return ans
+  }
+
+  //최대값 함수
+  function max(array) {
+    array = array.sort()
+    var ans = array[0]
+    for(i=1; array[i] != null; i++) {
+      if(array[i] > ans) {
+        ans = array[i]
+      }
+    }
+    return ans
+  }
+
+  //데이터 종류 개수 파악 함수
+  function count_k(array){
+    var unique = array.filter(function(value, index, self) {
+      return self.indexOf(value) === index;
+    });
+    return unique.length
+  }
+
+  //변수 추출 함수
+  function variable(data) {
+    var variable = Object.keys(data[0])
+    variable = variable.filter(function (value) {
+      return value != "";
+    })
+    return variable
+  }
+
+  //범주형 변수 파악 함수
+  function summary_cate(array) {
+    Species_list = new Array() //종류 리스트
+    Species_num = new Array() //종류별 도수
+    index = 0
+
+    for (var i of array) {
+      if (!(Species_list.includes(i))) { //해당 데이터가 종류 리스트에 없는 경우
+        Species_list.push(i)
+        Species_num.push(1)
+      } else { //해당 데이터가 종류 리스트에 있는 경우
+        for (var j of Species_list) {
+          if (i == j) {
+            index = Species_list.indexOf(i)
+            Species_num[index] += 1
+          }
+        }
+      }
+    }
+    return [Species_list, Species_num]
+  }
+
+  //연속형 변수 파악 함수
+  function summary_conti(array, n) {
+    //array.sort()를 하면 메모리가 낭비될 수 있음
+    var min = Math.min.apply(Math, array)
+    var max = Math.max.apply(Math, array)
+    var section_name = new Array();
+    var section_num = new Array();
+
+    for (var i=0; i<n; i++) {
+      section_name.push(parseFloat(min + ((max-min) * i/n)))
+      section_num.push(0)
+    }
+    section_name.push(max)
+
+    for (var j of array) {
+      for (var k=0; k<n; k++){
+        if ((section_name[k] <= j) & (j < section_name[k+1])) {
+          section_num[k] += 1;
+          break;
+        }
+      }
+      if (j == section_name[section_name.length-1]) {
+        section_num[section_num.length-1] += 1;
+      }
+    }
+    return [section_name, section_num]
+  }
+
+  //마우스에 따라 메뉴 색 변경
+  $(function(){
+    $('ul').on('click', 'li', function () {
+      $(this).parent().children().removeClass('active');
+      $(this).addClass('active');
+    });
+  });
+
+  //변수만큼 콤보박스 옵션 추가
+  var com1 = document.getElementById("combo1");
+  var com2 = document.getElementById("combo2");
+  var com3 = document.getElementById("combo3");
+
+  function create_opt(col){
+    for (var i=0; i<col.length; i++){ //생성된 요소는 1곳에만 붙을 수 있음
+      var opt = new Option();
+      opt.text = col[i]
+      opt.value = col[i]
+      com1.options.add(opt);
+    }
+    for (var j=0; j<col.length; j++){
+      var opt = new Option();
+      opt.text = col[j]
+      opt.value = col[j]
+      com2.options.add(opt);
+    }
+    for (var k=0; k<col.length; k++){
+      var opt = new Option();
+      opt.text = col[k]
+      opt.value = col[k]
+      com3.options.add(opt);
+    }
+  }
+
+  //데이터를 html 테이블로 출력하는 함수
+   function dataToTable(data) {
+     var col = Object.keys(data[0])
+     var myHTMLStr = '<table style="width:650px; "><tr>'
+     for (var i=0; i<col.length; i++) { //열 이름 붙이기
+       myHTMLStr += '<td>' + col[i] + '</td>'
+     }
+     myHTMLStr += '</tr>'
+
+     for (var i=0; i<data.length; i++) { //데이터 붙이기
+       myHTMLStr += '<tr>'
+       for (var j=0; j<col.length; j++) {
+         myHTMLStr += '<td>' + data[i][col[j]] + '</td>'
+       }
+       myHTMLStr += '</tr>'
+     }
+     myHTMLStr += '</table><br>'
+     return myHTMLStr
+   }
+
+  //파일 선택
+  var data;
+  var col;
+
+  $("#select_file").click(function() {
+    $("#import_file").click();
+  });
+
+  $("#import_file").change(importCSV);
+  function importCSV(event) {
+      var reader = new FileReader();
+      document.getElementById("filename").value = event.target.files[0].name;
+      reader.onload = function(e) {
+          data = d3.csvParse(reader.result);
+          col = variable(data)
+          $('#view_data').html(dataToTable(data))
+          create_opt(col)
+          //alert(JSON.stringify(data)) //데이터 형태 확인
+          //alert(col) //변수 확인
+      }
+      reader.readAsText(event.target.files[0]);
+      $("#import_file").val("");
+  }
+
+  //도수 분포표 table 함수
+  function dataToFreq(array) {
+    var colname = ["계급", "도수", "상대도수", "누적도수"]
+    array.sort()
+
+    var freq_table = '<table style="width:630px; border:1px solid gray; margin-top: 25px; margin-left:25px;"><tr>'
+    for (var i=0; i<colname.length; i++) {
+      freq_table += '<td>' + colname[i] + '</td>'
+    }
+    freq_table += '</tr>'
+
+    var kind = summary_cate(array)[0]
+    var num = summary_cate(array)[1]
+    var cum_num = cumsum(num)
+
+    for (var j=0; j<kind.length; j++) {
+      freq_table += '<tr>'
+      freq_table += '<td>' + kind[j] + '</td>'
+      freq_table += '<td>' + num[j] + '</td>'
+      freq_table += '<td>' + Math.floor(num[j]/count(array)*100)/100 + '</td>'
+      freq_table += '<td>' + Math.floor(cum_num[j]/count(array)*100)/100 + '</td>'
+      freq_table += '</tr>'
+    }
+    freq_table += '</table><br>'
+    return freq_table
+  }
+
+  //기초 통계량 table 함수
+  function dataToStat(data) {
+    var colname = ["자료 수", "평균", "중앙값", "분산", "표준편차", "최소값", "최대값", "범위"]
+
+    var tmp_data = {} //csv 데이터 mapping
+    for (var i=0; i<col.length; i++) {
+      var t = new Array();
+      for (var j=0; j<data.length; j++) {
+        t.push(data[j][col[i]])
+      }
+      tmp_data[col[i]] = t
+    }
+    //alert(JSON.stringify(tmp_data)) //확인
+
+    var stat_table = '<table style="width:650px; border:1px solid gray; margin-top: 25px; margin-left:25px;">'
+    stat_table += '<tr><td>' + ' ' + '</td>'
+    for (var k=0; k<col.length; k++) {
+      stat_table += '<td>' + col[k] + '</td>'
+    }
+    stat_table += '<tr><td>' + colname[0] + '</td>'
+    for (var k=0; k<col.length; k++) {
+      if (isNaN(count(tmp_data[col[k]]))) { //문자열 변수면 -로 출력
+        stat_table += '<td>' + '-' + '</td>'
+      } else {
+        stat_table += '<td>' + count(tmp_data[col[k]]) + '</td>'
+      }
+    }
+    stat_table += '</tr><tr><td>' + colname[1] + '</td>'
+    for (var k=0; k<col.length; k++) {
+      if (isNaN(mean(tmp_data[col[k]]))) {
+        stat_table += '<td>' + '-' + '</td>'
+      } else {
+        stat_table += '<td>' + mean(tmp_data[col[k]]) + '</td>'
+      }
+    }
+    stat_table += '</tr><tr><td>' + colname[2] + '</td>'
+    for (var k=0; k<col.length; k++) {
+      if (isNaN(median(tmp_data[col[k]]))) {
+        stat_table += '<td>' + '-' + '</td>'
+      } else {
+        stat_table += '<td>' + median(tmp_data[col[k]]) + '</td>'
+      }
+    }
+    stat_table += '</tr><tr><td>' + colname[3] + '</td>'
+    for (var k=0; k<col.length; k++) {
+      if (isNaN(dev(tmp_data[col[k]]))) {
+        stat_table += '<td>' + '-' + '</td>'
+      } else {
+        stat_table += '<td>' + dev(tmp_data[col[k]]) + '</td>'
+      }
+    }
+    stat_table += '</tr><tr><td>' + colname[4] + '</td>'
+    for (var k=0; k<col.length; k++) {
+      if (isNaN(sdd(tmp_data[col[k]]))) {
+        stat_table += '<td>' + '-' + '</td>'
+      } else {
+        stat_table += '<td>' + sdd(tmp_data[col[k]]) + '</td>'
+      }
+    }
+    stat_table += '</tr><tr><td>' + colname[5] + '</td>'
+    for (var k=0; k<col.length; k++) {
+      if (isNaN(Math.min.apply(Math, tmp_data[col[k]]))) {
+        stat_table += '<td>' + '-' + '</td>'
+      } else {
+        stat_table += '<td>' + Math.min.apply(Math, tmp_data[col[k]]) + '</td>'
+      }
+    }
+    stat_table += '</tr><tr><td>' + colname[6] + '</td>'
+    for (var k=0; k<col.length; k++) {
+      if (isNaN(Math.max.apply(Math, tmp_data[col[k]]))) {
+        stat_table += '<td>' + '-' + '</td>'
+      } else {
+        stat_table += '<td>' + Math.max.apply(Math, tmp_data[col[k]]) + '</td>'
+      }
+    }
+    stat_table += '</tr><tr><td>' + colname[7] + '</td>'
+    for (var k=0; k<col.length; k++) {
+      if (isNaN(Math.min.apply(Math, tmp_data[col[k]]))) {
+        stat_table += '<td>' + '-' + '</td>'
+      } else {
+        stat_table += '<td>' + Math.floor((Math.max.apply(Math, tmp_data[col[k]])-Math.min.apply(Math, tmp_data[col[k]]))*10)/10 + '</td>'
+      }
+    }
+    stat_table += '</tr></table>'
+    return stat_table
+  }
+
+  //도수 분포표 선택
+  $('#freq_table').on("click", function() {
+    type_graph = "freq"
+    com1.options[0].selected = true;
+    com2.options[0].selected = true;
+    document.getElementById("combo1").style.display = "inline-block"
+    document.getElementById("combo2").style.display = "none"
+    document.getElementById("select_var").style.display = "inline-block"
+    document.getElementById("input_interval").style.display = "none"
+    document.getElementById("hist_text").style.display = "none"
+    document.getElementById("regre").style.display = "none"
+    document.getElementById("group").style.display = "none"
+    document.getElementById("combo3").style.display = "none"
+    document.getElementById("select_group").style.display = "none"
+    document.getElementById("view_stat").style.display = "inline-block"
+    document.getElementById("Graph").style.display = "none"
+    $('#view_stat > table').remove()
+    d3.select("#Graph").selectAll("rect").remove()
+    d3.select("#Graph").selectAll("line").remove()
+    d3.select("#Graph").selectAll("text").remove()
+    d3.select("#Graph").selectAll("g").remove()
+  })
+
+  //기초 통계량 선택
+  $('#statistics').on("click", function() {
+    $('#view_stat').html(dataToStat(data))
+    com1.options[0].selected = true;
+    com2.options[0].selected = true;
+    document.getElementById("combo1").style.display = "none"
+    document.getElementById("combo2").style.display = "none"
+    document.getElementById("select_var").style.display = "none"
+    document.getElementById("input_interval").style.display = "none"
+    document.getElementById("hist_text").style.display = "none"
+    document.getElementById("regre").style.display = "none"
+    document.getElementById("group").style.display = "none"
+    document.getElementById("combo3").style.display = "none"
+    document.getElementById("select_group").style.display = "none"
+    document.getElementById("view_stat").style.display = "inline-block"
+    document.getElementById("Graph").style.display = "none"
+  })
+
+  //막대 그래프 선택
+  var type_graph;
+  $('#bargraph').on("click", function() {
+    type_graph = "bar"
+    com1.options[0].selected = true;
+    com2.options[0].selected = true;
+    document.getElementById("combo1").style.display = "inline-block"
+    document.getElementById("combo2").style.display = "none"
+    document.getElementById("select_var").style.display = "inline-block"
+    document.getElementById("input_interval").style.display = "none"
+    document.getElementById("hist_text").style.display = "none"
+    document.getElementById("regre").style.display = "none"
+    document.getElementById("group").style.display = "none"
+    document.getElementById("combo3").style.display = "none"
+    document.getElementById("select_group").style.display = "none"
+    document.getElementById("view_stat").style.display = "none"
+    document.getElementById("Graph").style.display = "inline-block"
+    d3.select("#Graph").selectAll("rect").remove()
+    d3.select("#Graph").selectAll("line").remove()
+    d3.select("#Graph").selectAll("text").remove()
+    d3.select("#Graph").selectAll("g").remove()
+    d3.select("#Graph").selectAll("circle").remove()
+  })
+
+  //히스토그램 선택
+  $('#histogram').on("click", function() {
+    type_graph = "hist"
+    com1.options[0].selected = true;
+    com2.options[0].selected = true;
+    document.getElementById("combo1").style.display = "inline-block"
+    document.getElementById("combo2").style.display = "none"
+    document.getElementById("select_var").style.display = "inline-block"
+    document.getElementById("regre").style.display = "none"
+    document.getElementById("group").style.display = "none"
+    document.getElementById("combo3").style.display = "none"
+    document.getElementById("select_group").style.display = "none"
+    document.getElementById("view_stat").style.display = "none"
+    document.getElementById("Graph").style.display = "inline-block"
+    d3.select("#Graph").selectAll("rect").remove()
+    d3.select("#Graph").selectAll("line").remove()
+    d3.select("#Graph").selectAll("text").remove()
+    d3.select("#Graph").selectAll("g").remove()
+    d3.select("#Graph").selectAll("circle").remove()
+  })
+
+  //구간 개수에 상관없이 고정적인 그래프 변수
+  var bar;
+  var svgWidth = 700;
+  var svgHeight = 500;
+  var padding = 30; //좌,우,위,아래 여백
+  var left_axis = 50 //왼쪽 축 공간
+  var title_area = 50 //제목 공간
+  var freq_area = 50 //빈도수 공간
+  var legend_area = 20 //범주 공간
+
+  //산점도 선택
+  $('#scatter').on("click", function() {
+    type_graph = "scat"
+    com1.options[0].selected = true;
+    com2.options[0].selected = true;
+    document.getElementById("combo1").style.display = "inline-block"
+    document.getElementById("combo2").style.display = "inline-block"
+    document.getElementById("select_var").style.display = "inline-block"
+    document.getElementById("input_interval").style.display = "none"
+    document.getElementById("hist_text").style.display = "none"
+    document.getElementById("regre").style.display = "none"
+    document.getElementById("group").style.display = "none"
+    document.getElementById("combo3").style.display = "none"
+    document.getElementById("select_group").style.display = "none"
+    document.getElementById("view_stat").style.display = "none"
+    document.getElementById("Graph").style.display = "inline-block"
+    d3.select("#Graph").selectAll("rect").remove()
+    d3.select("#Graph").selectAll("line").remove()
+    d3.select("#Graph").selectAll("text").remove()
+    d3.select("#Graph").selectAll("g").remove()
+    d3.select("#Graph").selectAll("circle").remove()
+  })
+
+  //그룹별 보기 선택
+  $('#group').on("click", function() {
+    document.getElementById("combo3").style.display = "inline-block"
+    document.getElementById("select_group").style.display = "inline-block"
+  })
+
+  //그룹 선택 완료
+  var x3;
+  var group_var;
+  var num;
+  var rainbow;
+  $('#select_group').on("click", function() {
+    d3.select("#Graph").selectAll("line").remove()
+    d3.select("#Graph").selectAll("circle").remove()
+
+    var group_array = new Array();
+    x3 = com3.options[com3.selectedIndex].value //x2 입력
+    for (var i=0; i<data.length; i++) {
+      group_array.push(data[i][x3])
+    }
+    group_var = summary_cate(group_array)[0]
+    //alert(group_var) //확인 완료
+
+    num = group_var.length
+    rainbow = new Array(num); //색상 배열
+    function sin_to_hex(i, phase) {
+      var sin = Math.sin(Math.PI / num * 2 * i + phase);
+      var int = Math.floor(sin * 127) + 128;
+      var hex = int.toString(16);
+      if (hex.length === 1) {
+        return "0" + hex
+      } else {
+        return hex
+      }
+    }
+    for (var i=0; i<num; i++) {
+      var red   = sin_to_hex(i, 0 * Math.PI * 2/3);
+      var blue  = sin_to_hex(i, 1 * Math.PI * 2/3);
+      var green = sin_to_hex(i, 2 * Math.PI * 2/3);
+      rainbow[i] = "#" + red + green + blue;
+    }
+
+    var scat_data2 = scat_data.map(function(d, i) { //mapping
+      return [d, group_array[i]];
+    });
+    //alert(JSON.stringify(scat_data2)) //확인
+
+    var xMin = Math.min.apply(Math, input_array1)
+    var xMax = Math.max.apply(Math, input_array1)
+    var yMin = Math.min.apply(Math, input_array2)
+    var yMax = Math.max.apply(Math, input_array2)
+
+    var dist_x = (xMax - xMin) / 10; //축과 바짝 그려지지 않도록 거리 조정
+    var dist_y = (yMax - yMin) / 10;
+
+    var xMin_ = xMin - dist_x
+    var xMax_ = xMax + dist_x
+    var yMin_ = yMin - dist_y
+    var yMax_ = yMax + dist_y
+
+    var dot = d3.select("#Graph")
+    var xScale = d3.scaleLinear().domain([xMin_, xMax_]).range([padding+left_axis/2, svgWidth-padding])
+    var yScale = d3.scaleLinear().domain([yMin_, yMax_]).range([svgHeight-padding-legend_area, padding+title_area+freq_area])
+
+    var g = dot.selectAll("scatter-dots").data(scat_data)
+    .enter()
+    .append("svg:circle")
+    .attr("cx", function (d, i) { return xScale(d[0]) })
+    .attr("cy", function (d) { return yScale(d[1]) })
+    .attr("r", 3)
+    .style("fill", function (d, i) {
+      for (var k=0; k<num; k++) {
+        if (data[i][x3] == group_var[k]) {
+          return rainbow[k]
+        }
+      }
+    })
+
+   //그룹 범례 >>> svg에 추가로 나타나지 않아 해결 중!
+    var g_name = dot.selectAll("text").data(group_var)
+    g_name.enter()
+          .append("text")
+          .attr("x", svgWidth - padding)
+          .attr("y", function (d, i) { return i*padding})
+          .text(function (d, i) { return d })
+
+    var g_color = dot.selectAll("circle").data(rainbow)
+    g_color.enter()
+           .append("circle")
+           .attr("cx", svgWidth - 2*padding)
+           .attr("cy", function (d, i) { return i*padding})
+           .attr("r", 5)
+           .style("fill", function (d) { return d })
+
+  })
+
+  //산점도 행렬 선택
+  $('#scat_matrix').on("click", function() {
+    type_graph = "scat_matrix"
+    com1.options[0].selected = true;
+    com2.options[0].selected = true;
+    document.getElementById("combo1").style.display = "none"
+    document.getElementById("combo2").style.display = "none"
+    document.getElementById("select_var").style.display = "none"
+    document.getElementById("input_interval").style.display = "none"
+    document.getElementById("hist_text").style.display = "none"
+    document.getElementById("regre").style.display = "none"
+    document.getElementById("group").style.display = "none"
+    document.getElementById("combo3").style.display = "none"
+    document.getElementById("select_group").style.display = "none"
+    document.getElementById("view_stat").style.display = "inline-block"
+    document.getElementById("Graph").style.display = "none"
+    d3.select("#Graph").selectAll("rect").remove()
+    d3.select("#Graph").selectAll("line").remove()
+    d3.select("#Graph").selectAll("text").remove()
+    d3.select("#Graph").selectAll("g").remove()
+    d3.select("#Graph").selectAll("circle").remove()
+
+    $('#view_stat > table').remove()
+    $('#view_stat > svg').remove()
+
+    var tmp_data = {} //csv 데이터 mapping
+    for (var i=0; i<col.length; i++) {
+      var t = new Array();
+      for (var j=0; j<data.length; j++) {
+        t.push(data[j][col[i]])
+      }
+      tmp_data[col[i]] = t
+    }
+    //alert(JSON.stringify(tmp_data)) //확인
+
+    var n_svgWidth = (svgWidth-2*padding) / col.length;
+    var n_svgHeight = (svgHeight-2*padding) / col.length;
+    var n_padding = padding / col.length;
+    var n_left_axis = left_axis / col.length;
+    var n_title_area = title_area / col.length;
+    var n_freq_area = freq_area / col.length;
+    var n_legend_area = legend_area / col.length;
+
+    for (var i=0; i<col.length; i++) {
+      for (var j=0; j<col.length; j++) {
+
+        if (i == j) { //히스토그램
+          var num = 7
+          var graphData = summary_conti(tmp_data[col[i]], num)
+          var section_name = graphData[0]
+          var section_num = graphData[1]
+          //alert(section_name); alert(section_num);//확인 완료
+
+          var section_freq = new Array(); //막대 면적
+          var section_y = new Array(); //막대 높이
+          for (var k of section_num){
+            section_freq.push(k / tmp_data[col[i]].length)
+            section_y.push(k / tmp_data[col[i]].length / (section_name[1]-section_name[0]))
+          }
+          //alert(section_freq); alert(section_y) //확인 완료
+
+          //구간 개수에 따라 유동적인 그래프 변수
+          var barWidth = (n_svgWidth - 2*(n_padding) - n_left_axis) / num
+          var dataMax = Math.max.apply(Math, section_y)
+          var dataMin = Math.min.apply(Math, section_y)
+          var coef_y = (n_svgHeight - 2*n_padding - n_title_area - n_freq_area - n_legend_area) / dataMax
+
+          var svg = d3.select("#view_stat").append("svg").attr("width", n_svgWidth).attr("height", n_svgHeight)
+          svg.append("text")
+             .text(`< ${col[i]} >`)
+             .attr("x", n_svgWidth/2)
+             .attr("y", n_padding*2)
+             .style("font-size", "10px")
+             .style("text-anchor", "middle")
+
+          var bar = svg.selectAll("rect").data(section_y)
+          bar.enter() //히스토그램
+             .append("rect")
+             .attr("x", function(d, i) { return n_padding + n_left_axis + i*barWidth; })
+             .attr("y", n_svgHeight - n_padding - n_legend_area)
+             .attr("width", barWidth)
+             .attr("height", 0)
+             .transition()
+             .duration(2500) //동작 시간
+             .delay(function(d, i) { return i*200; }) //동작 시간
+             .attr("y", function(d, i) { return n_svgHeight - n_padding - n_legend_area - (coef_y*d); })
+             .attr("height", function(d, i) { return coef_y*d + "px"; })
+
+          bar.enter() //구간 시작점
+             .append("text")
+             .data(section_name)
+             .attr("x", function(d, i) { return n_padding + n_left_axis/2 + i*barWidth; })
+             .attr("y", n_svgHeight - n_padding/2)
+             .text(function(d, i) { return d.toFixed(1); })
+             .style("font-size", "5px")
+
+          bar.enter() //구간 마지막 값
+             .append("text")
+             .text(section_name.pop().toFixed(1))
+             .attr("x", n_svgWidth - n_padding - n_left_axis/3)
+             .attr("y", n_svgHeight - n_padding/2)
+             .style("font-size", "5px")
+
+          var yScale = d3.scaleLinear().domain([dataMin, dataMax]).range([n_svgHeight - n_padding - n_legend_area, n_padding + n_title_area + n_freq_area])
+          svg.append("g") //축
+             .attr("transform", `translate(${n_padding + n_left_axis/2}, 0)`)
+             .call(d3.axisLeft().scale(yScale))
+             .style("font-size", "5px")
+             .style("stroke-width", "0.5px")
+
+           //정규분포 N(m, sigma^2) 직선 추가
+           var m = mean(tmp_data[col[i]])
+           var sd = sdd(tmp_data[col[i]])
+           var xmin = Math.min.apply(Math, tmp_data[col[i]])
+           var xmax = Math.max.apply(Math, tmp_data[col[i]])
+           var ymin = normal(xmin, m , sd)
+           var ymax = normal(m, m, sd)
+           var gap = (n_svgHeight - 2*n_padding - n_title_area - n_freq_area - n_legend_area) / ymax
+
+           var repeat_n = 400
+           for (var r=0; r<repeat_n; r++) {
+             var line;
+             svg.append("line")
+                .attr("x1", n_padding + n_left_axis + (n_svgWidth - 2*n_padding - n_left_axis) * (r/repeat_n))
+                .attr("y1", (n_svgHeight - n_padding - n_legend_area) - normal(xmin + (xmax-xmin) * r/repeat_n, m, sd) * gap)
+                .attr("x2", n_padding + n_left_axis + (n_svgWidth - 2*n_padding - n_left_axis) * ((r+1)/repeat_n))
+                .attr("y2", (n_svgHeight - n_padding - n_legend_area) - normal(xmin + (xmax-xmin) * (r+1)/repeat_n, m, sd) * gap)
+                .style("stroke","red")
+           }
+
+        } else { //산점도
+          var scat_data = tmp_data[col[i]].map(function(d, ii) { //mapping
+            return [d, tmp_data[col[j]][ii]];
+          });
+          //alert(JSON.stringify(scat_data)) //확인
+
+          //유동적인 그래프 변수
+          var xMin = Math.min.apply(Math, tmp_data[col[i]])
+          var xMax = Math.max.apply(Math, tmp_data[col[i]])
+          var yMin = Math.min.apply(Math, tmp_data[col[j]])
+          var yMax = Math.max.apply(Math, tmp_data[col[j]])
+
+          var dist_x = (xMax - xMin) / 10; //축과 바짝 그려지지 않도록 거리 조정
+          var dist_y = (yMax - yMin) / 10;
+
+          var xMin_ = xMin - dist_x
+          var xMax_ = xMax + dist_x
+          var yMin_ = yMin - dist_y
+          var yMax_ = yMax + dist_y
+
+          var svg = d3.select("#view_stat").append("svg").attr("width", n_svgWidth).attr("height", n_svgHeight)
+
+          var xScale = d3.scaleLinear().domain([xMin_, xMax_]).range([n_padding+n_left_axis/2, n_svgWidth-n_padding])
+          svg.append("g") //축
+             .attr("transform", `translate(0, ${n_svgHeight-n_padding-n_legend_area})`)
+             .call(d3.axisBottom().scale(xScale))
+             .style("font-size", "5px")
+             .style("stroke-width", "0.5px")
+
+          var yScale = d3.scaleLinear().domain([yMin_, yMax_]).range([n_svgHeight-n_padding-n_legend_area, n_padding+n_title_area+n_freq_area])
+          svg.append("g") //축
+             .attr("transform", `translate(${n_padding + n_left_axis/2}, 0)`)
+             .call(d3.axisLeft().scale(yScale))
+             .style("font-size", "5px")
+             .style("stroke-width", "0.5px")
+
+          var g = svg.selectAll("scatter-dots")
+             .data(scat_data)
+             .enter()
+             .append("svg:circle")
+             .attr("cx", function (d, i) { return xScale(d[0]) })
+             .attr("cy", function (d) { return yScale(d[1]) })
+             .attr("r", 1)
+        }
+      }
+    }
+  })
+
+  var x1; //선택한 변수1
+  var x2; //선택한 변수2
+  var input_array1 = new Array(); //x1 배열
+  var input_array2 = new Array(); //x2 배열
+  var scat_data; //산점도 배열
+
+  //그래프 출력 함수(선택 완료 버튼)
+  function graph_btn() {
+    d3.select("#Graph").selectAll("rect").remove()
+    d3.select("#Graph").selectAll("line").remove()
+    d3.select("#Graph").selectAll("text").remove()
+    d3.select("#Graph").selectAll("g").remove()
+    d3.select("#Graph").selectAll("circle").remove()
+
+    input_array1 = []; //초기화
+    input_array2 = [];
+    x1 = ""
+    x2 = ""
+
+    tmp1 = com1.options[com1.selectedIndex].value //x1 입력
+    for (var i=0; i<col.length; i++){
+      if (tmp1 == col[i]){
+        x1 = col[i]
+      }
+    }
+    for (var j=0; j<data.length; j++) {
+      input_array1.push(data[j][x1])
+    }
+
+    //도수 분포표 선택
+    if (type_graph == "freq") {
+      $('#view_stat').html(dataToFreq(input_array1))
+
+     //막대 그래프 선택
+    } else if (type_graph == "bar") {
+	      input_array1.sort()
+        var graphData = summary_cate(input_array1)
+        var cate_list = graphData[0]
+        var cate_num = graphData[1]
+        //alert(Species_list); alert(Species_num) //확인 완료
+
+        //범주에 따라 유동적인 그래프 변수
+        var num = cate_list.length
+        var interval = 100 / num; //bar 사이 간격
+        var barWidth = (svgWidth - 2*padding - left_axis - (num-1)*interval) / num
+        var dataMax = Math.max.apply(Math, cate_num)
+        var dataMin = Math.min.apply(Math, cate_num)
+        var coef_y = (svgHeight - 2*padding - title_area - freq_area - legend_area) / dataMax
+
+        bar = d3.select("#Graph").selectAll("rect").data(cate_num)
+        bar.enter() //제목
+           .append("text")
+           .text(`< ${x1} BarGraph >`)
+           .attr("x", svgWidth/2)
+           .attr("y", padding)
+	         .style("text-anchor", "middle")
+
+        bar.enter() //막대 그래프
+           .append("rect")
+           .attr("x", function(d, i) { return padding + left_axis + i*(barWidth+interval); })
+           .attr("y", svgHeight - padding - legend_area)
+           .attr("width", barWidth)
+           .attr("height", 0)
+           .transition()
+           .duration(2000) //동작 시간
+           .delay(function(d, i) { return i*50; }) //동작 시간
+           .attr("y", function(d, i) { return svgHeight - padding - legend_area - (coef_y*d); })
+           .attr("height", function(d, i) { return coef_y*d + "px"; })
+
+        bar.enter() //종류별 도수
+           .append("text")
+           .data(cate_num)
+           .attr("class", "freq")
+           .attr("x", function(d, i) { return padding + left_axis + barWidth/2 + (barWidth + interval)*i; })
+           .attr("y", padding + title_area)
+           .text(function(d, i) { return d; })
+
+        bar.enter() //종류 이름
+           .append("text")
+           .data(cate_list)
+           .attr("class", "barname")
+           .attr("x", function(d, i) { return padding + left_axis + barWidth/2 + (barWidth + interval)*i; })
+           .attr("y", svgHeight - padding)
+           .text(function(d, i) { return d; })
+
+        var yScale = d3.scaleLinear().domain([0, dataMax]).range([svgHeight - padding - legend_area, padding + title_area + freq_area])
+        d3.select("#Graph")
+          .append("g") //축
+          .attr("class", "axis")
+          .attr("transform", `translate(${padding + left_axis/2}, 0)`)
+          .call(d3.axisLeft().scale(yScale))
+
+    //히스토그램 선택
+    } else if (type_graph == "hist") {
+      document.getElementById("input_interval").style.display = "block"
+      document.getElementById("input1").value = ""
+
+    //산점도 선택
+    } else if (type_graph == "scat") {
+      document.getElementById("regre").style.display = "inline-block"
+      document.getElementById("group").style.display = "inline-block"
+
+      tmp2 = com2.options[com2.selectedIndex].value //x2 입력
+      for (var i=0; i<col.length; i++){
+        if (tmp2 == col[i]){
+          x2 = col[i]
+        }
+      }
+      for (var j=0; j<data.length; j++) {
+        input_array2.push(data[j][x2])
+      }
+      scat_data = input_array1.map(function(d, i) { //mapping
+        return [d, input_array2[i]];
+      });
+      //alert(JSON.stringify(scat_data)) //확인
+
+      //유동적인 그래프 변수
+      var xMin = Math.min.apply(Math, input_array1)
+      var xMax = Math.max.apply(Math, input_array1)
+      var yMin = Math.min.apply(Math, input_array2)
+      var yMax = Math.max.apply(Math, input_array2)
+
+      var dist_x = (xMax - xMin) / 10; //축과 바짝 그려지지 않도록 거리 조정
+      var dist_y = (yMax - yMin) / 10;
+
+      var xMin_ = xMin - dist_x
+      var xMax_ = xMax + dist_x
+      var yMin_ = yMin - dist_y
+      var yMax_ = yMax + dist_y
+
+      var dot = d3.select("#Graph")
+
+      dot.append("text") //제목
+         .text(`< ${x1} vs ${x2} Scatter-plot >`)
+         .attr("x", svgWidth/2)
+         .attr("y", padding)
+	       .style("text-anchor", "middle")
+
+      var xScale = d3.scaleLinear().domain([xMin_, xMax_]).range([padding+left_axis/2, svgWidth-padding])
+      dot.append("g") //축
+         .attr("class", "axis")
+         .attr("transform", `translate(0, ${svgHeight-padding-legend_area})`)
+         .call(d3.axisBottom().scale(xScale))
+
+
+      var yScale = d3.scaleLinear().domain([yMin_, yMax_]).range([svgHeight-padding-legend_area, padding+title_area+freq_area])
+      dot.append("g") //축
+         .attr("class", "axis")
+         .attr("transform", `translate(${padding + left_axis/2}, 0)`)
+         .call(d3.axisLeft().scale(yScale))
+
+      var g = dot.selectAll("scatter-dots")
+      .data(scat_data)
+      .enter()
+      .append("svg:circle")
+      .attr("cx", function (d, i) { return xScale(d[0]) })
+      .attr("cy", function (d) { return yScale(d[1]) })
+      .attr("r", 3)
+    }
+  }
+
+  //히스토그램 실행 함수
+  function hist_btn() {
+    d3.select("#Graph").selectAll("rect").remove()
+    d3.select("#Graph").selectAll("line").remove()
+    d3.select("#Graph").selectAll("text").remove()
+    d3.select("#Graph").selectAll("g").remove()
+    d3.select("#Graph").selectAll("circle").remove()
+
+    document.getElementById("hist_text").style.display = "block"
+    input_array1 = [];
+    x1 = ""
+
+    tmp1 = com1.options[com1.selectedIndex].value //x1 입력
+    for (var i=0; i<col.length; i++){
+      if (tmp1 == col[i]){
+        x1 = col[i]
+      }
+    }
+    for (var j=0; j<data.length; j++) {
+      input_array1.push(data[j][x1])
+    }
+
+      var graphData;
+      var section_name;
+      var section_num;
+      var num = document.getElementById('input1').value
+      if (num == "") {
+        alert("구간 개수를 입력해주세요.")
+      } else {
+        graphData = summary_conti(input_array1, parseInt(num))
+        section_name = graphData[0]
+        section_num = graphData[1]
+      }
+      //alert(section_name); alert(section_num);//확인 완료
+
+      var section_freq = new Array(); //막대 면적
+      var section_y = new Array(); //막대 높이
+      for (var i of section_num){
+        section_freq.push(i / input_array1.length)
+        section_y.push(i / input_array1.length / (section_name[1]-section_name[0]))
+      }
+      //alert(section_freq); alert(section_y) //확인 완료
+
+      //구간 개수에 따라 유동적인 그래프 변수
+      var interval = 0; //bar 사이 간격
+      var barWidth = (svgWidth - 2*padding - left_axis - (num-1)*interval) / num
+      var dataMax = Math.max.apply(Math, section_y)
+      var dataMin = Math.min.apply(Math, section_y)
+      var coef_y = (svgHeight - 2*padding - title_area - freq_area - legend_area) / dataMax
+
+      var bar = d3.select("#Graph").selectAll("rect").data(section_y)
+      bar.enter() //제목
+         .append("text")
+         .text(`< ${x1} Histogram >`)
+         .attr("x", svgWidth/2)
+         .attr("y", padding)
+	       .style("text-anchor", "middle")
+
+      bar.enter() //히스토그램
+         .append("rect")
+         .attr("x", function(d, i) { return padding + left_axis + i*(barWidth+interval); })
+         .attr("y", svgHeight - padding - legend_area)
+         .attr("width", barWidth)
+         .attr("height", 0)
+         .transition()
+         .duration(2500) //동작 시간
+         .delay(function(d, i) { return i*200; }) //동작 시간
+         .attr("y", function(d, i) { return svgHeight - padding - legend_area - (coef_y*d); })
+         .attr("height", function(d, i) { return coef_y*d + "px"; })
+
+      bar.enter() //구간별 도수
+         .append("text")
+         .data(section_freq)
+         .attr("class", "freq")
+         .attr("x", function(d, i) { return padding + left_axis + barWidth/2.5 + (barWidth + interval)*i; })
+         .attr("y", padding + title_area - 10)
+         .text(function(d, i) { return d.toFixed(2); })
+
+      bar.enter() //구간 시작점
+         .append("text")
+         .data(section_name)
+         .attr("class", "barname")
+         .attr("x", function(d, i) { return padding + left_axis/2 + (barWidth + interval)*i; })
+         .attr("y", svgHeight - padding)
+         .text(function(d, i) { return d.toFixed(1); })
+
+      bar.enter() //구간 마지막 값
+         .append("text")
+         .text(section_name.pop().toFixed(1))
+         .attr("class", "barname")
+         .attr("x", svgWidth - padding - left_axis/3)
+         .attr("y", svgHeight - padding)
+
+      var yScale = d3.scaleLinear().domain([dataMin, dataMax]).range([svgHeight - padding - legend_area, padding + title_area + freq_area])
+      d3.select("#Graph").append("g") //축
+        .attr("class", "axis")
+        .attr("transform", `translate(${padding + left_axis/2}, 0)`)
+        .call(d3.axisLeft().scale(yScale))
+
+      //정규분포 N(m, sigma^2) 직선 추가
+      var m = mean(input_array1)
+      var sd = sdd(input_array1)
+      var xmin = Math.min.apply(Math, input_array1)
+      var xmax = Math.max.apply(Math, input_array1)
+      var ymin = normal(xmin, m , sd)
+      var ymax = normal(m, m, sd)
+      var gap = (svgHeight - 2*padding - title_area - freq_area - legend_area) / ymax
+
+      var repeat_n = 800
+      for(var i=0; i<repeat_n; i++) {
+        var line;
+        d3.select("#Graph")
+          .append("line")
+          .attr("x1", padding + left_axis + (svgWidth - 2*padding - left_axis) * (i/repeat_n))
+          .attr("y1", (svgHeight - padding - legend_area) - normal(xmin + (xmax-xmin) * i/repeat_n, m, sd) * gap)
+          .attr("x2", padding + left_axis + (svgWidth - 2*padding - left_axis) * ((i+1)/repeat_n))
+          .attr("y2", (svgHeight - padding - legend_area) - normal(xmin + (xmax-xmin) * (i+1)/repeat_n, m, sd) * gap)
+          .style("stroke","red")
+    }
+  }
+
+  //회귀직선 추가
+  $("#regre").click(function (array_x, array_y) {
+    array_x = input_array1
+    array_y = input_array2
+    var xMin = Math.min.apply(Math, array_x)
+    var xMax = Math.max.apply(Math, array_x)
+    var yMin = Math.min.apply(Math, array_y)
+    var yMax = Math.max.apply(Math, array_y)
+
+    var dist_x = (xMax - xMin) / 10; //축과 바짝 그려지지 않도록 거리 조정
+    var dist_y = (yMax - yMin) / 10;
+
+    var xMin_ = xMin - dist_x
+    var xMax_ = xMax + dist_x
+    var yMin_ = yMin - dist_y
+    var yMax_ = yMax + dist_y
+
+    var Mx = mean(array_x)
+    var My = mean(array_y)
+    var beta0 = 0
+    var beta1 = 0
+    var ssum = 0
+
+    for (var i=0; i<array_x.length; i++) {
+      beta1 += parseFloat((array_x[i]-Mx) * (array_y[i]-My))
+    }
+    for (var j=0; j<array_x.length; j++) {
+      ssum += parseFloat((array_x[j]-Mx) * (array_x[j]-Mx))
+    }
+    beta1 = beta1/ssum
+    beta0 = parseFloat(My - beta1 * Mx)
+    //alert(beta0); alert(beta1) //확인
+
+    var xScale = d3.scaleLinear().domain([xMin_, xMax_]).range([padding+left_axis/2, svgWidth-padding])
+    var yScale = d3.scaleLinear().domain([yMin_, yMax_]).range([svgHeight-padding-legend_area, padding+title_area+freq_area])
+
+    var x1 = xScale(xMin)
+    var y1 = yScale(beta0 + beta1*xMin)
+    var x2 = xScale(xMax)
+    var y2 = yScale(beta0 + beta1*xMax)
+
+    var dot = d3.select("#Graph")
+    dot.append("svg:line")
+       .attr("x1", x1)
+       .attr("y1", y1)
+       .attr("x2", x2)
+       .attr("y2", y2)
+       .style("stroke", "red")
+    })
+
+  </script>
+
+</body>
+</html>

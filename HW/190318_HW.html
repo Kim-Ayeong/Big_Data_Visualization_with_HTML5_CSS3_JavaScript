@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+  <title>
+    범주형 데이터 시각화
+  </title>
+  <style>
+    body {
+      text-align: center;
+      align-items: center;
+    }
+    svg {
+      width:700px;
+      height:500px;
+      border:1px solid black;
+    }
+    #BarGraph rect{
+      stroke:lightblue;
+      stroke-width:2px;
+      fill:lightblue;
+      opacity:0.7;
+    }
+    .title {
+      font-size:15pt;
+      fill:red;
+    }
+    .barname {
+      font-size:12pt;
+    }
+    .frep {
+      fonr-size:9pt;
+      fill:red;
+    }
+    .axis text {
+      font-family: sans-serif;
+      font-size: 12px;
+    }
+    .axis path,
+    .axis line {
+      fill:none;
+      stroke-width:1px;
+      stroke:black;
+    }
+  </style>
+  <script type="text/javascript" src="http://d3js.org/d3.v4.min.js"></script>
+  <script src='http://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js'></script>
+</head>
+
+<body>
+  <div style="float: left;">
+    <input type="button" value="첫 화면으로" onclick="location.href='index_start.html'">
+  </div>
+
+  <h2> 범주형 데이터 시각화 </h2><hr>
+  <h3><span style="color:red;"> ex) R 패키지 iris dataset 살펴보기 </span><h3>
+
+  <div>
+    <div style="width:700px; height:500px; border:1px solid black; overflow:auto; display:inline-block;" id="view_data"></div>&nbsp;&nbsp;&nbsp;
+    <svg id="BarGraph"></svg>
+  </div>
+
+  <script>
+  //데이터를 html 테이블로 출력하는 함수
+  function dataToTable(data) {
+    var myHTMLStr = '<table>'
+    myHTMLStr += '<tr><td>' + "Sepal.Length"
+              + '</td><td>' + "Sepal.Width"
+              + '</td><td>' + "Petal.Length"
+              + '</td><td>' + "Petal.Width"
+              + '</td><td>' + "Species"
+              + '</td></tr>';
+
+    for(var i in data) {
+      myHTMLStr += '<tr><td>' + data[i].Sepal_Length
+                + '</td><td>' + data[i].Sepal_Width
+                + '</td><td>' + data[i].Petal_Length
+                + '</td><td>' + data[i].Petal_Width
+                + '</td><td>' + data[i].Species
+                + '</td></tr>';
+    }
+    myHTMLStr +='</table>';
+    return myHTMLStr
+  }
+
+  //범주형 변수 파악 함수
+  function summary_cate(array) {
+    Species_list = new Array() //종류 리스트
+    Species_num = new Array() //종류별 도수
+    index = 0
+
+    for (var i of array) {
+      if (!(Species_list.includes(i))) { //해당 데이터가 종류 리스트에 없는 경우
+        Species_list.push(i)
+        Species_num.push(1)
+      } else { //해당 데이터가 종류 리스트에 있는 경우
+        for (var j of Species_list) {
+          if (i == j) {
+            index = Species_list.indexOf(i)
+            Species_num[index] += 1
+          }
+        }
+      }
+    }
+    Species_list.pop() //배열 길이와 인덱스의 차이를 해결하고자 마지막 요소 제거
+    Species_num.pop()
+    return [Species_list, Species_num]
+  }
+
+  //범주에 상관없이 고정적인 그래프 변수
+  var bar;
+  var svgWidth = 700;
+  var svgHeight = 500;
+  var padding = 30; //좌,우,위,아래 여백
+  var interval = 20; //bar 사이 간격
+  var left_axis = 50 //왼쪽 축 공간
+  var title_area = 50 //제목 공간
+  var freq_area = 10 //범주별 도수 공간
+  var legend_area = 20 //범주 공간
+
+  //C 드라이브에 chrome 임시 폴더 생성
+  //크롬 브라우저 속성에 --disable-web-security --user-data-dir="C:\chrome" 추가
+
+  d3.csv("iris(add).csv", function(error, data_csv) {
+
+    //alert(JSON.stringify(data_csv[0].Species)) //데이터 형태 확인 완료
+    if (error) throw error;
+    $('#view_data').html(dataToTable(data_csv)) //데이터를 table형태로 출력
+
+    var Species = new Array() //Species 데이터만 추출 및 저장
+    for (var i in data_csv) {
+      Species.push(data_csv[i].Species)
+    }
+    var graphData = summary_cate(Species)
+    var Species_list = graphData[0]
+    var Species_num = graphData[1]
+    //alert(Species_list); alert(Species_num) //확인 완료
+
+    //범주에 따라 유동적인 그래프 변수
+    var num = Species_list.length
+    var barWidth = (svgWidth - 2*padding - left_axis - (num-1)*interval) / num
+    var dataMax = Math.max.apply(Math, Species_num)
+    var dataMin = Math.min.apply(Math, Species_num)
+    var coef_y = (svgHeight - 2*padding - title_area - freq_area - legend_area) / dataMax
+
+    bar = d3.select("#BarGraph").selectAll("rect").data(Species_num)
+    bar.enter() //제목
+       .append("text")
+       .text("< Species's BarGraph >")
+       .attr("x", svgWidth/3)
+       .attr("y", padding)
+
+    bar.enter() //막대 그래프
+       .append("rect")
+       .attr("x", function(d, i) { return padding + left_axis + i*(barWidth+interval); })
+       .attr("y", svgHeight - padding - legend_area)
+       .attr("width", barWidth)
+       .attr("height", 0)
+       .transition()
+       .duration(2500) //동작 시간
+       .delay(function(d, i) { return i*200; }) //동작 시간
+       .attr("y", function(d, i) { return svgHeight - padding - legend_area - (coef_y*d); })
+       .attr("height", function(d, i) { return coef_y*d + "px"; })
+
+    bar.enter() //종류별 도수
+       .append("text")
+       .data(Species_num)
+       .attr("class", "freq")
+       .attr("x", function(d, i) { return padding + left_axis + barWidth/2 + (barWidth + interval)*i; })
+       .attr("y", padding + title_area)
+       .text(function(d, i) { return d; })
+
+    bar.enter() //종류 이름
+       .append("text")
+       .data(Species_list)
+       .attr("class", "barname")
+       .attr("x", function(d, i) { return padding + left_axis + barWidth/5 + (barWidth + interval)*i; })
+       .attr("y", svgHeight - padding)
+       .text(function(d, i) { return d; })
+
+    var yScale = d3.scaleLinear().domain([dataMin, dataMax]).range([svgHeight - padding - legend_area, padding + title_area + freq_area])
+    d3.select("#BarGraph").append("g") //축
+      .attr("class", "axis")
+      .attr("transform", `translate(${padding + left_axis/2}, 0)`)
+      .call(d3.axisLeft().scale(yScale))
+  })
+  </script>
+
+</body>
+</html>

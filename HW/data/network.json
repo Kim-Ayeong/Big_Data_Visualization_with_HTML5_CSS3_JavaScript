@@ -1,0 +1,23 @@
+{
+  "nodes":[
+    {"name":"서울", "group":1},
+    {"name":"인천", "group":1},
+    {"name":"대전", "group":2},
+    {"name":"광주", "group":3},
+    {"name":"대구", "group":4},
+    {"name":"부산", "group":4}
+  ],
+  "links":[
+    {"source":0, "target":1, "weight":1},
+    {"source":0, "target":2, "weight":2},
+    {"source":0, "target":3, "weight":3.2},
+    {"source":0, "target":4, "weight":3.3},
+    {"source":0, "target":5, "weight":4},
+    {"source":1, "target":5, "weight":4.1},
+    {"source":2, "target":3, "weight":2.2},
+    {"source":2, "target":5, "weight":3},
+    {"source":3, "target":4, "weight":3},
+    {"source":4, "target":5, "weight":1.1},
+    {"source":5, "target":3, "weight":3.1}
+  ]
+}

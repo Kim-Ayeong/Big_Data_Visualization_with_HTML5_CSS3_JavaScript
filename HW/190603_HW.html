@@ -1,0 +1,189 @@
+<html>
+
+ <script src="https://d3js.org/d3.v4.min.js"></script>
+ <script src="https://d3js.org/d3-queue.v3.min.js"></script>
+ <script src="https://d3js.org/topojson.v0.min.js"></script>
+
+ <head>
+  <meta charset="utf-8">
+  <title> Geographic Data Visualization </title>
+  <style>
+   .province {
+     fill: none;
+     stroke: #999;
+   }
+   .setting {
+     position: relative;
+     left: 500px;
+     top: 250px;
+     border:2px solid;
+     width: 400px;
+     padding: 5px;
+   }
+   .gender {
+     margin: 5px;
+     padding: 5px;
+     border: 1px solid;
+   }
+   .interval {
+     margin: 5px;
+     padding: 5px;
+     border: 1px solid;
+   }
+   input[type="text"] {
+     width: 40px;
+   }
+  </style>
+ </head>
+
+ <body>
+  <h2> 2015 시도별 인구 분포도 </h2>
+  <form class="setting">
+   <div class="gender"> 시도별 인구 선택 <br>
+    <input type="radio" name="gender" value="Total" checked> 종합
+    <input type="radio" name="gender" value="Male"> 남성
+    <input type="radio" name="gender" value="Female"> 여성
+   </div>
+   <div class="interval"> 인구 구간 설정 <br>
+    <input id="x0" type="text" value="0">
+    <input id="x1" type="text" value="100">
+    <input id="x2" type="text" value="200">
+    <input id="x3" type="text" value="400">
+    <input id="x4" type="text" value="700">
+    <input id="x5" type="text" value="1000">
+    <input id="x6" type="text" value="1300">
+   </div>
+   <button type="button" value="Updata"onclick="onClick()"> 실행 </button>
+  </form>
+
+  <script>
+   var w=1000, h=700;
+   // initialize svg
+   var svg = d3.select("body")
+               .append("svg")
+               .attr("width", w)
+               .attr("height", h);
+   // Choropleth color
+   var color = d3.scaleThreshold()
+                 .domain([0,100,200,400,700,1000,1300])
+                 .range(["#ffffd9","#edf8b1","#c7e9b4","#7fcdbb","#41b6c4","#1d91c0","#225ea8"]);
+   // x domain for legend
+   var x = d3.scaleLinear()
+             .domain([0,1300])
+             .range([0,400]);
+
+   updateLegend();
+   updateMap("Total");
+
+   function updateLegend() {
+    //Remove previously drawn legend
+    d3.selectAll(".tick").remove();
+    d3.selectAll("rect").remove();
+    var legend= svg.append("g")
+                   .attr("class", "key")
+                   .attr("transform", "translate(500,40)");
+    legend.selectAll("rect")
+          .data(color.range()
+          .map(function(d) {
+           d = color.invertExtent(d);
+           if(d[0] == null) d[0] = x.domain()[0];
+           if(d[1] == null) d[1] = x.domain()[1];
+           return d;
+          }))
+          .enter()
+          .append("rect")
+          .attr("height",8)
+          .attr("x", function(d) { return x(d[0]); })
+          .attr("width", function(d) { return x(d[1])-x(d[0]); })
+          .attr("fill", function(d) { return color(d[0]); });
+
+    legend.append("text")
+          .attr("class", "caption")
+          .attr("x", x.range()[0]-5)
+          .attr("y", -6)
+          .attr("fill", "#000")
+          .attr("text-anchor","start")
+          .attr("font-weight", "bold")
+          .text("인구 구간")
+
+    legend.call(d3.axisBottom(x)
+          .tickSize(13)
+          .tickValues(color.domain())
+          .tickFormat(function(x) {
+           return x === 1300 ? x + "만명" : x;
+          }))
+          .select(".domain")
+          .remove();
+   }
+
+   function updateMap(gender) {
+    d3.selectAll("path")
+      .remove(); //remove previously drawn map
+    //combining json and csv data
+    d3.queue()
+      .defer(d3.json, "KOR_adm1.json")
+      .defer(d3.csv, "EX190603.csv")
+      .await(ready);
+
+    //Generate choropleth
+    function ready(error, kor, popData) {
+     if(error) throw error;
+     //path projection
+     var proj = d3.geoMercator()
+                  .center([128.0, 35.9])
+                  .scale(4000)
+                  .translate([w/2, h/2]);
+     var path = d3.geoPath()
+                  .projection(proj);
+     //make an array of population for each province
+     var popByID = {};
+     var population;
+     popData.forEach(function(d) {
+      if (gender === "Male") {
+       population = +d.남자;
+      } else if (gender === "Female") {
+       population = +d.여자;
+      } else {
+       population = +d.전체;
+      }
+      popByID[d.ID_1] = population;
+     });
+     //Genarate Map
+     var provinces = topojson.object(kor, kor.objects['KOR_adm1']);
+
+     svg.selectAll('path')
+        .data(provinces.geometries)
+        .enter()
+        .append('path')
+        .attr('class', 'province')
+        .style('fill', function(d) {return color(popByID[d.properties.ID_1]);})
+        .attr('d', path)
+        .attr("transform", "translate(-300, -100)");
+    }
+   }
+
+   function onClick() {
+    //Assign variables from input textboxes
+    var x0 = +document.getElementByld("x0").value,
+        x1 = +document.getElementByld("x1").value,
+        x2 = +document.getElementByld("x2").value,
+        x3 = +document.getElementByld("x3").value,
+        x4 = +document.getElementByld("x4").value,
+        x5 = +document.getElementByld("x5").value,
+        x6 = +document.getElementByld("x6").value;
+    var intervals = [x0,x1,x2,x3,x4,x5,x6];
+    //check if every input is a number
+    var isNotNumber = intervals.some(function(d) {return isNaN(d);});
+    if (isNotNumber) {alert("구간 설정란에는 숫자만 입력할 수 있습니다."); return false;}
+    //check if every input is within range
+    if(x0 >= x1 || x1 >= x2 || x2 >= x3 || x3 >= x4 || x4 >= x5 || x5 >= x6) {
+     alert("구간 설정이 올바르지 않습니다."); return false;
+    }
+    x.domain([x0,x6]);
+    color.domain([x0,x1,x2,x3,x4,x5,x6]); //update color domain interval
+    updateLegend();
+    updateMap(document.querySelector('input[name="gender"]:checked').value);
+   }
+  </script>
+ </body>
+</html>
