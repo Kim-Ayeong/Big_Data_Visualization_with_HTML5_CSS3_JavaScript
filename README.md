@@ -7,7 +7,7 @@
 
 - 주교재 : HTML5, CSS3, JavaScript를 이용한 빅데이터 시각화
 
-  - <img src="https://lh3.googleusercontent.com/proxy/7g5XsDUP_M4S76QU-Usrb38Tw_S71SUsp_pKTFvZJz4OIyLC1_kkrE64KrmNUKvqaVNTY6EZ-Yz0ySV2Ae5J5mZYwZqGHS7bH9g6p5NBomrl0y0E0gXalVaqFeA5bY0gCQMj6g" alt="HTML5, CSS3, JavaScript를 이용한 빅데이터 시각화 이미지 검색결과&quot;" style="zoom: 67%;" />
+  - <img src="https://lh3.googleusercontent.com/proxy/q6fXquP4yleSKLOcS_1fNcEcSZE3iXHV-IRd6gYlJonTrvse1ZVJzkajrUNiqbFujflO4KH4vsEqW3wwd6SW8lj0ym3slgGXQ6R8aluvGD_2a-ojhgQJ7Qs9T2CTAXCpbLfeRQ" alt="HTML5, CSS3, JavaScript를 이용한 빅데이터 시각화 이미지 검색결과" style="zoom:67%;" />
 
     
 
